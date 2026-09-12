@@ -23,6 +23,37 @@ https://github.com/user-attachments/assets/77438826-80a9-4ab2-9fc3-42407a2d0adb
 
 ---
 
+> [!NOTE]
+> ## About this fork
+>
+> This is a fork of [jonnyoo/glance](https://github.com/jonnyoo/glance) that adds **Night Boost** — face unlock that
+> works in a dark room. Upstream, a dark room means the webcam hands the recognition model an under-exposed, noisy
+> face and the scan times out. A MacBook has no infrared illuminator, so Night Boost uses the only light there is: the
+> display itself.
+>
+> Three layers behind one setting (**General → Night**, on by default):
+>
+> | | |
+> |---|---|
+> | **Measure** | Each frame's mean brightness, one cheap pass. Below a threshold, the room counts as dark. |
+> | **Gain** | Denoise, raise exposure, lift shadows — before the face model sees the frame. |
+> | **Light** | A warm panel over the top third of the display the camera faces, brightness raised for the length of the scan and restored afterwards. |
+>
+> The details are answers to the anti-spoof code rather than taste. The panel is warm (~3000K) because the glare
+> check rejects near-*grey* highlights — a white light would reject a live face immediately, while this colour needs a
+> 1.6x brighter reflection before it does. It covers only the top third because the lock screen draws the password
+> field near the middle, and hiding your manual fallback while face unlock is struggling is the wrong trade. Frames
+> captured while the light is still ramping are skipped rather than judged. The anti-spoof checks read the ungained
+> frame, so brightening can never invent or erase the evidence of a spoof.
+>
+> Everything else in this repo is upstream's work. Night Boost is offered back as
+> [jonnyoo/glance#21](https://github.com/jonnyoo/glance/pull/21).
+>
+> **The download button below is upstream's build and does not include Night Boost.** To get it, build this fork from
+> source — see [Building from source](#building-from-source).
+
+---
+
 > [!WARNING]
 > ## Read before downloading
 > ## Glance is not as secure as Apple's FaceID or TouchID
