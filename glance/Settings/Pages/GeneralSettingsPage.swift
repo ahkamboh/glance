@@ -19,7 +19,6 @@ struct GeneralSettingsPage: View {
     /// System Settings clears the prompt below without a relaunch.
     @State private var inputMonitoring = SpaceKeyMonitor.inputMonitoringAccess
 
-    /// True once "On space" is selected but glance can't read the keyboard yet.
     private var needsInputMonitoring: Bool {
         settings.unlockTriggers.contains(.onSpace) && inputMonitoring != .granted
     }

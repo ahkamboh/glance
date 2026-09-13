@@ -27,8 +27,6 @@ struct AboutSettingsPage: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            // Plain imageset, not an app-icon catalog entry — those live in
-            // a restricted namespace `Image(_:)` can't resolve.
             Image("appicon")
                 .resizable()
                 .frame(width: 80, height: 80)
@@ -69,7 +67,6 @@ struct AboutSettingsPage: View {
                 title: "Send Feedback",
                 buttonTitle: "Send"
             ) {
-                // TODO: point this at the real feedback destination once one exists.
                 if let url = URL(string: "https://tryglance.app/feedback") {
                     NSWorkspace.shared.open(url)
                 }

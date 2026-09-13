@@ -159,7 +159,6 @@ struct YourFaceSettingsPage: View {
                 )
             }
 
-            // Worth saying out loud that face unlock now matches nobody.
             if !store.identities.isEmpty && store.activeIdentities.isEmpty {
                 SettingsCaption(text: "No identities are enabled — face unlock won't recognize anyone until you switch one back on.")
             }
