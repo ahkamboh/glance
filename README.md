@@ -155,7 +155,7 @@ debug section should appear in the sidebar.
   ```
 2. Open in Xcode:
   ```bash
-   open glance/glance.xcodeproj
+   open glance.xcodeproj
   ```
 3. Run the project:
   - Click `run` or press `Cmd + R`.
@@ -173,8 +173,8 @@ App feedback goes to [tryglance.app/feedback](https://tryglance.app/feedback).
 - **[The Boring Notch](https://github.com/TheBoredTeam/boring.notch)** — for the notch window
 physics.
 - **[InsightFace](https://github.com/deepinsight/insightface)** — the ArcFace model doing the
- recognition.
-
+recognition.
+- **[Alcove](https://tryalcove.com)** — big design inspiration.
 
 
 ## License
