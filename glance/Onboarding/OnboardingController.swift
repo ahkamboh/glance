@@ -668,8 +668,16 @@ final class OnboardingController {
         }
     }
 
+    private var hasPromptedAccessibility = false
+
     func grantAccessibility() {
+        guard !hasPromptedAccessibility else {
+            openSystemSettings(pane: "Privacy_Accessibility")
+            return
+        }
+        hasPromptedAccessibility = true
         KeystrokeInjector.promptForAccessibility()
+        refreshPermissions()
     }
 
     func grantCamera() {

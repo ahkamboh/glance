@@ -362,4 +362,11 @@ final class NotchOverlayController {
         // need to. Onboarding additionally needs key so its text field can receive keystrokes.
         windowController.setInteractive(isArmed || phase == .failure || phase == .onboarding, key: phase == .onboarding)
     }
+
+    /// Called by `NotchOverlayView` whenever the visible panel's own frame
+    /// changes (step change, expand/collapse, hover bump, …) — see
+    /// `NotchWindowController.updateMousePassthrough()`.
+    func updateInteractiveContentRect(_ rect: CGRect?) {
+        windowController.setInteractiveContentRect(rect)
+    }
 }

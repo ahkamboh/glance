@@ -16,6 +16,16 @@
 import SwiftUI
 import AppKit
 
+/// The visible panel's current frame, relative to the fixed window's full
+/// bounds — see the `.background(GeometryReader...)` in `body` and
+/// `NotchWindowController.updateMousePassthrough()`.
+private struct InteractivePanelFramePreferenceKey: PreferenceKey {
+    static var defaultValue: CGRect? = nil
+    static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) {
+        value = nextValue() ?? value
+    }
+}
+
 struct NotchOverlayView: View {
     let controller: NotchOverlayController
 
@@ -257,6 +267,19 @@ struct NotchOverlayView: View {
         .frame(width: currentSize.width, height: currentSize.height)
         .background(Color.black)
         .clipShape(NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, style: style))
+        // Reports this panel's own current frame, relative to the fixed
+        // window's full bounds (`Self.interactiveCoordinateSpace`, declared
+        // below on the outermost frame) — restricts the window's click
+        // capture to the shape actually on screen instead of its whole
+        // fixed max-envelope frame. See `NotchWindowController.updateMousePassthrough()`.
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: InteractivePanelFramePreferenceKey.self,
+                    value: proxy.frame(in: .named(Self.interactiveCoordinateSpace))
+                )
+            }
+        )
         // Shadow only while expanded — otherwise it left a faint dim halo around the
         // real notch even while "closed" in armed mode. Radius is fixed rather than
         // growing on hover since a larger radius needs more window margin than is reserved.
@@ -302,7 +325,16 @@ struct NotchOverlayView: View {
             height: NotchGeometry.windowSize(for: style).height,
             alignment: .top
         )
+        // Anchored on this outermost, full-window-sized frame so the panel's
+        // reported frame above is directly comparable to the hosting view's
+        // own bounds — see `NotchWindowController.updateMousePassthrough()`.
+        .coordinateSpace(name: Self.interactiveCoordinateSpace)
+        .onPreferenceChange(InteractivePanelFramePreferenceKey.self) { rect in
+            controller.updateInteractiveContentRect(rect)
+        }
     }
+
+    private static let interactiveCoordinateSpace = "NotchOverlayRoot"
 
     /// Staggers the two when both need to change (see file header for why this uses
     /// real `Task.sleep` delays rather than `Animation.delay()`).
