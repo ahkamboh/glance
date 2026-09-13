@@ -105,6 +105,11 @@ enum SettingsMetrics {
     static let rowFont = Font.system(size: 13, weight: .regular)
     static let rowSpacing: CGFloat = 12
     static let rowHorizontalInset: CGFloat = 14
+    /// Shared cap on a row's subtitle width — keeps a longer explanatory
+    /// line from stretching toward the trailing control/tiles, and keeps
+    /// every subtitle (plain rows and `SettingsLabeledOptionRow` alike)
+    /// wrapping at the same width.
+    static let rowSubtitleMaxWidth: CGFloat = 260
     /// Two-line slider rows size to their content instead of `rowHeight`;
     /// this keeps their total height visually in step with single-line rows
     /// in the same group.

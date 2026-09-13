@@ -72,6 +72,9 @@ struct SettingsRow<Trailing: View>: View {
 struct SettingsRowContent<Trailing: View>: View {
     let title: String
     var subtitle: String? = nil
+    /// Caps the subtitle's width so it wraps instead of stretching toward
+    /// the trailing control; `nil` (the default) leaves it unconstrained.
+    var subtitleMaxWidth: CGFloat? = nil
     /// Explanatory text for an inline `SettingsInfoButton`; `nil` renders no icon.
     var info: String? = nil
     @ViewBuilder var trailing: () -> Trailing
@@ -90,14 +93,20 @@ struct SettingsRowContent<Trailing: View>: View {
                 if let subtitle {
                     Text(subtitle)
                         .font(.system(size: 11))
-                        .foregroundStyle(SettingsMetrics.textSecondary)
+                        .foregroundStyle(SettingsMetrics.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: subtitleMaxWidth, alignment: .leading)
                 }
             }
             Spacer(minLength: 8)
             trailing()
         }
         .padding(.horizontal, SettingsMetrics.rowHorizontalInset)
-        .frame(height: SettingsMetrics.rowHeight)
+        // `minHeight`, not a fixed `height` — every existing (subtitle-less)
+        // row still sizes to exactly `rowHeight`, but a wrapped subtitle can
+        // grow the row taller instead of getting clipped.
+        .frame(minHeight: SettingsMetrics.rowHeight)
+        .padding(.vertical, subtitle == nil ? 0 : 10)
     }
 }
 
@@ -324,6 +333,53 @@ struct SettingsSteppedSliderRowContent: View {
     }
 }
 
+/// A grouped row whose control is a discrete slider with every stop's own
+/// label laid out beneath it — leading/center/trailing for three — instead
+/// of a single "current value" readout on the title line. Used by
+/// Recognition's confidence and distance sliders, both of which snap to
+/// three named stops.
+struct SettingsOptionSliderRowContent: View {
+    let title: String
+    /// One label per stop, left-to-right; the first is leading-aligned, the
+    /// last trailing-aligned, and any in between centered.
+    let stepLabels: [String]
+    /// Index into the option list, not a real quantity — see `AutoLockInterval.sliderIndex`.
+    @Binding var index: Double
+    let stopCount: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(SettingsMetrics.rowFont)
+                .foregroundStyle(SettingsMetrics.textPrimary)
+            // Tighter than the title-to-slider gap above, so the labels
+            // read as annotating the slider's stops rather than floating a
+            // full row's worth of space below it.
+            VStack(alignment: .leading, spacing: 2) {
+                Slider(value: $index, in: 0...Double(max(stopCount - 1, 1)), step: 1)
+                    .controlSize(.regular)
+                    .tint(GlanceTheme.accent)
+                HStack {
+                    ForEach(Array(stepLabels.enumerated()), id: \.offset) { position, label in
+                        Text(label)
+                            .font(.system(size: 13))
+                            .foregroundStyle(SettingsMetrics.textTertiary)
+                            .frame(maxWidth: .infinity, alignment: alignment(at: position))
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, SettingsMetrics.rowHorizontalInset)
+        .padding(.vertical, SettingsMetrics.sliderRowVerticalPadding)
+    }
+
+    private func alignment(at position: Int) -> Alignment {
+        if position == 0 { return .leading }
+        if position == stepLabels.count - 1 { return .trailing }
+        return .center
+    }
+}
+
 /// A destructive button that only fires after being held down continuously,
 /// filling with red left-to-right as confirmation of progress — used
 /// instead of a confirmation dialog so the commitment is cancellable
@@ -507,6 +563,11 @@ struct SettingsLabeledOptionRow<Content: View>: View {
                         .font(.system(size: 11))
                         .foregroundStyle(SettingsMetrics.textTertiary)
                         .fixedSize(horizontal: false, vertical: true)
+                        // Same cap as `SettingsRowContent`'s Liveness
+                        // detection subtitle, so both wrap at the same
+                        // width instead of one stretching further than the
+                        // other depending on how many tiles sit beside it.
+                        .frame(maxWidth: SettingsMetrics.rowSubtitleMaxWidth, alignment: .leading)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -721,21 +782,26 @@ private struct UnlockStillThumbnail: View {
 
 /// Liveness depth picker — connects, inside one `SettingsGroup`, to the
 /// "Liveness checks" toggle above it (see `RecognitionSettingsPage`). Same
-/// shape as `UnlockAnimationPicker`.
+/// title-left/tiles-right shape as `UnlockTriggerPicker`.
 struct LivenessModePicker: View {
     @Binding var selection: LivenessMode
     var isEnabled: Bool = true
 
     var body: some View {
-        SettingsOptionRow {
+        SettingsLabeledOptionRow(
+            title: "Strength",
+            subtitle: "Light includes basic protection. Heavy requires you to blink or slightly move your head."
+        ) {
             ForEach(LivenessMode.allCases) { mode in
                 SettingsOptionTile(
                     title: mode.title,
                     isSelected: selection == mode,
-                    action: { selection = mode }
+                    action: { selection = mode },
+                    previewHeight: SettingsMetrics.triggerOptionPreviewSize.height,
+                    previewWidth: SettingsMetrics.triggerOptionPreviewSize.width
                 ) {
                     Image(systemName: iconName(for: mode))
-                        .font(.system(size: 20, weight: .regular))
+                        .font(.system(size: 16, weight: .regular))
                         .foregroundStyle(SettingsOptionTile<EmptyView>.previewTint(isSelected: selection == mode))
                 }
             }

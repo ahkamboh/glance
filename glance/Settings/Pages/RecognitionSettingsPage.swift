@@ -57,18 +57,18 @@ struct RecognitionSettingsPage: View {
     private var unlockedState: some View {
         VStack(alignment: .leading, spacing: 20) {
             SettingsGroup {
-                SettingsSteppedSliderRowContent(
+                SettingsOptionSliderRowContent(
                     title: "Match confidence",
-                    valueLabel: matchConfidenceLevel.title,
+                    stepLabels: MatchConfidenceLevel.allCases.map(\.title),
                     index: matchConfidenceIndex,
                     stopCount: MatchConfidenceLevel.allCases.count
                 )
 
                 SettingsGroupDivider()
 
-                SettingsSteppedSliderRowContent(
+                SettingsOptionSliderRowContent(
                     title: "Detection distance",
-                    valueLabel: detectionDistanceLevel.title,
+                    stepLabels: DetectionDistanceLevel.allCases.map(\.title),
                     index: detectionDistanceIndex,
                     stopCount: DetectionDistanceLevel.allCases.count
                 )
@@ -79,7 +79,8 @@ struct RecognitionSettingsPage: View {
                 SettingsGroup {
                     SettingsRowContent(
                         title: "Liveness detection",
-                        info: "Checks that you're a live person, not a photo. May increase unlock time."
+                        subtitle: "Checks that you're a live person, not a photo. May increase unlock time.",
+                        subtitleMaxWidth: SettingsMetrics.rowSubtitleMaxWidth
                     ) {
                         GlanceToggle(isOn: $settings.livenessChecksEnabled)
                     }
