@@ -80,7 +80,7 @@ struct SettingsWindowView: View {
     /// The header and tab bar float over the scroll content as overlays so
     /// scrolled rows pass underneath them rather than being pushed aside.
     private var contentPage: some View {
-        ScrollView(.vertical) {
+        ScrollView(.vertical, showsIndicators: false) {
             pageBody
                 .padding(.horizontal, SettingsMetrics.contentHorizontalPadding)
                 .padding(.top, SettingsMetrics.headerHeight + 4)
