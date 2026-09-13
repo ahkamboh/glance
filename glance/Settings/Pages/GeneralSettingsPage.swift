@@ -148,11 +148,9 @@ struct GeneralSettingsPage: View {
         NSWorkspace.shared.open(url)
     }
 
-    /// Menu-in-a-capsule, like `CameraSettingsPage.cameraPicker`, but hugging
-    /// its label: the pill grows and shrinks with the selected display's name.
     private func displayPicker() -> some View {
         SettingsRowContent(title: "Display on") {
-            Menu {
+            SettingsMenuPickerPill(label: displayLabel) {
                 Button("Main display") {
                     settings.preferredDisplayID = nil
                     settings.preferredDisplayName = nil
@@ -163,34 +161,7 @@ struct GeneralSettingsPage: View {
                         settings.preferredDisplayName = screen.name
                     }
                 }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(displayLabel)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .foregroundStyle(SettingsMetrics.textPrimary)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 7, weight: .semibold))
-                        .foregroundStyle(SettingsMetrics.textSecondary)
-                }
-                .font(.system(size: 11))
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-                .background(Capsule().fill(SettingsMetrics.pickerPillFill))
-                .overlay {
-                    Capsule()
-                        .strokeBorder(SettingsMetrics.rowBorder, lineWidth: SettingsMetrics.rowBorderWidth)
-                }
-                .contentShape(Capsule())
             }
-            // `.button` + `.plain` renders the label as ordinary SwiftUI
-            // content, so the capsule chrome and padding above are honored.
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            // Window-level accent tint otherwise paints the menu label blue.
-            .tint(SettingsMetrics.textPrimary)
         }
     }
 

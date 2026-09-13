@@ -130,43 +130,11 @@ struct CameraSettingsPage: View {
 
     private func cameraPicker(title: String, selection: Binding<String?>) -> some View {
         SettingsRowContent(title: title) {
-            // Capsule chrome sits *behind* the Menu — macOS Menu labels
-            // discard backgrounds applied inside the label hierarchy.
-            ZStack {
-                Capsule()
-                    .fill(SettingsMetrics.pickerPillFill)
-
-                Menu {
-                    Button("System default") { selection.wrappedValue = nil }
-                    ForEach(devices) { device in
-                        Button(device.name) { selection.wrappedValue = device.id }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(cameraLabel(for: selection.wrappedValue))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .foregroundStyle(SettingsMetrics.textPrimary)
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 7, weight: .semibold))
-                            .foregroundStyle(SettingsMetrics.textSecondary)
-                    }
-                    .font(.system(size: 11))
-                    .padding(.horizontal, 8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .contentShape(Capsule())
+            SettingsMenuPickerPill(label: cameraLabel(for: selection.wrappedValue)) {
+                Button("System default") { selection.wrappedValue = nil }
+                ForEach(devices) { device in
+                    Button(device.name) { selection.wrappedValue = device.id }
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .buttonStyle(.plain)
-                // Window-level accent tint otherwise paints the menu label blue.
-                .tint(SettingsMetrics.textPrimary)
-            }
-            .frame(width: 160, height: 28)
-            .overlay {
-                Capsule()
-                    .strokeBorder(SettingsMetrics.rowBorder, lineWidth: SettingsMetrics.rowBorderWidth)
             }
         }
     }

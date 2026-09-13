@@ -101,6 +101,48 @@ struct SettingsRowContent<Trailing: View>: View {
     }
 }
 
+/// A trailing `Menu` rendered as a pill that hugs its label — the capsule
+/// grows and shrinks with the current selection's text rather than sitting
+/// at a fixed width. Shared by General's "Display on" row and Camera's
+/// per-slot device pickers, so every dropdown in Settings looks the same.
+struct SettingsMenuPickerPill<MenuContent: View>: View {
+    let label: String
+    @ViewBuilder var menuContent: () -> MenuContent
+
+    var body: some View {
+        Menu {
+            menuContent()
+        } label: {
+            HStack(spacing: 6) {
+                Text(label)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(SettingsMetrics.textPrimary)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(SettingsMetrics.textSecondary)
+            }
+            .font(.system(size: 13))
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+            .background(Capsule().fill(SettingsMetrics.pickerPillFill))
+            .overlay {
+                Capsule()
+                    .strokeBorder(SettingsMetrics.rowBorder, lineWidth: SettingsMetrics.rowBorderWidth)
+            }
+            .contentShape(Capsule())
+        }
+        // `.button` + `.plain` renders the label as ordinary SwiftUI
+        // content, so the capsule chrome and padding above are honored.
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        // Window-level accent tint otherwise paints the menu label blue.
+        .tint(SettingsMetrics.textPrimary)
+    }
+}
+
 /// Multiple `SettingsRowContent` rows in one card, separated by hairline
 /// dividers that match `rowBorder`.
 struct SettingsGroup<Content: View>: View {
