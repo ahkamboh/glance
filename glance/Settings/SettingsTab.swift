@@ -2,17 +2,11 @@
 //  SettingsTab.swift
 //  glance
 //
-//  The sidebar's tab list and section grouping. DEBUG currently holds only
-//  Face Lab — the remaining live test harness, kept for ongoing tuning.
+//  The tab bar's tab list. Debug-only Face Lab — the remaining live test
+//  harness, kept for ongoing tuning — is appended only once revealed.
 //
 
 import SwiftUI
-
-enum SettingsSection: String, CaseIterable, Hashable {
-    case authentication = "Authentication"
-    case glance = "Glance"
-    case debug = "Debug"
-}
 
 enum SettingsTab: String, CaseIterable, Identifiable, Hashable {
     case general
@@ -28,7 +22,7 @@ enum SettingsTab: String, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .general: return "General"
-        case .yourFace: return "Your Face"
+        case .yourFace: return "Face"
         case .password: return "Password"
         case .camera: return "Camera"
         case .recognition: return "Recognition"
@@ -51,43 +45,9 @@ enum SettingsTab: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Top-to-bottom gradient stops for this tab's icon badge
-    /// (`SettingsTabIconBadge`). Two colors, read top-first; a flat tile is
-    /// just the same color listed twice.
-    var badgeGradientColors: [Color] {
-        switch self {
-        case .general: return GlanceTheme.badgeGeneral
-        case .yourFace: return GlanceTheme.badgeYourFace
-        case .password: return GlanceTheme.badgePassword
-        case .camera: return GlanceTheme.badgeCamera
-        case .recognition: return GlanceTheme.badgeRecognition
-        case .about: return GlanceTheme.badgeGeneral
-        case .debugFaceLab: return GlanceTheme.badgeGeneral
-        }
-    }
-
-    /// Section this tab is grouped under. `nil` renders with no header —
-    /// the ungrouped "General" row at the top.
-    var section: SettingsSection? {
-        switch self {
-        case .general: return nil
-        case .yourFace, .password, .camera, .recognition: return .authentication
-        case .about: return .glance
-        case .debugFaceLab: return .debug
-        }
-    }
-
-    /// Sections in sidebar display order, including the ungrouped leading
-    /// section (`nil`).
-    static let sectionOrder: [SettingsSection?] = [nil, .authentication, .glance, .debug]
-
-    /// `sectionOrder`, minus `.debug` unless it's been unlocked this launch
-    /// — see `AppEnvironment.isDebugSectionRevealed`.
-    static func sectionOrder(includingDebug: Bool) -> [SettingsSection?] {
-        includingDebug ? sectionOrder : sectionOrder.filter { $0 != .debug }
-    }
-
-    static func tabs(in section: SettingsSection?) -> [SettingsTab] {
-        allCases.filter { $0.section == section }
+    /// Tabs in tab bar order, minus `.debugFaceLab` unless it's been
+    /// unlocked this launch — see `AppEnvironment.isDebugSectionRevealed`.
+    static func visibleTabs(includingDebug: Bool) -> [SettingsTab] {
+        includingDebug ? allCases : allCases.filter { $0 != .debugFaceLab }
     }
 }

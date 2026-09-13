@@ -86,11 +86,11 @@ struct GeneralSettingsPage: View {
         VStack(alignment: .leading, spacing: 8) {
             SettingsSectionTitle(text: "Behaviour")
             SettingsGroup {
-                SettingsRowContent(title: "Retry again on Hover") {
+                SettingsRowContent(title: "Retry on notch hover") {
                     GlanceToggle(isOn: $settings.retryOnHover)
                 }
                 SettingsGroupDivider()
-                SettingsRowContent(title: "Auto retry again once") {
+                SettingsRowContent(title: "Auto retry once after failure") {
                     GlanceToggle(isOn: $settings.autoRetryOnce)
                 }
                 SettingsGroupDivider()
@@ -148,51 +148,49 @@ struct GeneralSettingsPage: View {
         NSWorkspace.shared.open(url)
     }
 
-    /// Same Menu-in-a-capsule pattern as `CameraSettingsPage.cameraPicker`.
+    /// Menu-in-a-capsule, like `CameraSettingsPage.cameraPicker`, but hugging
+    /// its label: the pill grows and shrinks with the selected display's name.
     private func displayPicker() -> some View {
         SettingsRowContent(title: "Display on") {
-            ZStack {
-                Capsule()
-                    .fill(SettingsMetrics.pickerPillFill)
-
-                Menu {
-                    Button("Main display") {
-                        settings.preferredDisplayID = nil
-                        settings.preferredDisplayName = nil
-                    }
-                    ForEach(screens.compactMap(NamedScreen.init), id: \.id) { screen in
-                        Button(screen.name) {
-                            settings.preferredDisplayID = screen.id
-                            settings.preferredDisplayName = screen.name
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(displayLabel)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .foregroundStyle(SettingsMetrics.textPrimary)
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 7, weight: .semibold))
-                            .foregroundStyle(SettingsMetrics.textSecondary)
-                    }
-                    .font(.system(size: 11))
-                    .padding(.horizontal, 8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .contentShape(Capsule())
+            Menu {
+                Button("Main display") {
+                    settings.preferredDisplayID = nil
+                    settings.preferredDisplayName = nil
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .buttonStyle(.plain)
-                // Window-level accent tint otherwise paints the menu label blue.
-                .tint(SettingsMetrics.textPrimary)
+                ForEach(screens.compactMap(NamedScreen.init), id: \.id) { screen in
+                    Button(screen.name) {
+                        settings.preferredDisplayID = screen.id
+                        settings.preferredDisplayName = screen.name
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(displayLabel)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .foregroundStyle(SettingsMetrics.textPrimary)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 7, weight: .semibold))
+                        .foregroundStyle(SettingsMetrics.textSecondary)
+                }
+                .font(.system(size: 11))
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .background(Capsule().fill(SettingsMetrics.pickerPillFill))
+                .overlay {
+                    Capsule()
+                        .strokeBorder(SettingsMetrics.rowBorder, lineWidth: SettingsMetrics.rowBorderWidth)
+                }
+                .contentShape(Capsule())
             }
-            .frame(width: 160, height: 28)
-            .overlay {
-                Capsule()
-                    .strokeBorder(SettingsMetrics.rowBorder, lineWidth: SettingsMetrics.rowBorderWidth)
-            }
+            // `.button` + `.plain` renders the label as ordinary SwiftUI
+            // content, so the capsule chrome and padding above are honored.
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            // Window-level accent tint otherwise paints the menu label blue.
+            .tint(SettingsMetrics.textPrimary)
         }
     }
 

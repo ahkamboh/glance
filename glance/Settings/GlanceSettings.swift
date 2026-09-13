@@ -77,8 +77,8 @@ enum UnlockTrigger: String, CaseIterable, Identifiable {
 
     var iconName: String {
         switch self {
-        case .onWake: return "zzz"
-        case .onLock: return "lock.display"
+        case .onWake: return "moon.fill"
+        case .onLock: return "lock.laptopcomputer"
         case .onSpace: return "space"
         }
     }

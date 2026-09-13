@@ -2,10 +2,9 @@
 //  SettingsWindowView.swift
 //  glance
 //
-//  Root layout: blurred background showing through a translucent sidebar,
-//  a content panel floating above it as its own inset, shadowed card (see
-//  SettingsMetrics.contentBackgroundColor / sidebarBackgroundColor), a fixed
-//  sidebar, and the selected page.
+//  Root layout: one `.sidebar` material behind the whole window, the
+//  selected page scrolling beneath a transparent header (traffic lights and
+//  the session lock button) and a floating tab bar pinned to the bottom.
 //
 
 import SwiftUI
@@ -22,7 +21,7 @@ struct HeaderAction: Equatable {
 }
 
 /// Lets one page (today, only Camera's "Refresh camera list") publish a
-/// trailing action into the shared page header without the header needing
+/// trailing action into the shared header without the header needing
 /// to know that page's state. Switching away resolves back to `defaultValue`.
 struct HeaderTrailingActionKey: PreferenceKey {
     static var defaultValue: HeaderAction? { nil }
@@ -53,61 +52,8 @@ struct SettingsWindowView: View {
     private var settingsContent: some View {
         ZStack {
             VisualEffectView()
-            SettingsMetrics.sidebarBackgroundColor
-
-            HStack(spacing: 0) {
-                SettingsSidebar(
-                    selection: $selection,
-                    pocController: environment.pocController,
-                    isDebugSectionRevealed: environment.isDebugSectionRevealed
-                )
-
-                ZStack {
-                    // Opaque underlay casts the panel drop shadow. Shadow on
-                    // the translucent content stack would follow SettingsRow
-                    // alpha instead of the card outline.
-                    RoundedRectangle(
-                        cornerRadius: SettingsMetrics.contentCornerRadius,
-                        style: .continuous
-                    )
-                    .fill(SettingsMetrics.contentShadowFill)
-                    .shadow(
-                        color: SettingsMetrics.contentShadowColor,
-                        radius: SettingsMetrics.contentShadowRadius
-                    )
-
-                    ZStack(alignment: .top) {
-                        SettingsMetrics.contentBackgroundColor
-                        contentPage
-                    }
-                    // All four corners — the panel is a floating card inset
-                    // from every window edge (see .padding below).
-                    .clipShape(
-                        RoundedRectangle(cornerRadius: SettingsMetrics.contentCornerRadius, style: .continuous)
-                    )
-                    // Outer black ring (dark mode only) — same treatment as the
-                    // Unlock Animation preview tiles.
-                    .overlay(
-                        RoundedRectangle(
-                            cornerRadius: SettingsMetrics.contentCornerRadius
-                                + SettingsMetrics.optionPreviewOuterStrokeWidth,
-                            style: .continuous
-                        )
-                        .strokeBorder(
-                            SettingsMetrics.optionPreviewOuterStroke,
-                            lineWidth: SettingsMetrics.optionPreviewOuterStrokeWidth
-                        )
-                        .padding(-SettingsMetrics.optionPreviewOuterStrokeWidth)
-                    )
-                    // Hairline stroke on the content (not the underlay) so it
-                    // draws above the clipped page rather than under it.
-                    .overlay(
-                        RoundedRectangle(cornerRadius: SettingsMetrics.contentCornerRadius, style: .continuous)
-                            .strokeBorder(SettingsMetrics.contentStrokeColor, lineWidth: 1)
-                    )
-                }
-                .padding(SettingsMetrics.contentOuterSpacing)
-            }
+            SettingsMetrics.windowTintColor
+            contentPage
         }
         // No `.clipShape`, manual stroke, or `.shadow` on the outer window —
         // deliberately: the window keeps its native background (see
@@ -131,40 +77,36 @@ struct SettingsWindowView: View {
         .onDisappear { selection = .general }
     }
 
-    /// The header floats over the scroll content in a `ZStack` so scrolled
-    /// rows pass underneath it rather than being pushed down. Fully
-    /// transparent — see the note on `SettingsMetrics.headerHeight`.
+    /// The header and tab bar float over the scroll content as overlays so
+    /// scrolled rows pass underneath them rather than being pushed aside.
     private var contentPage: some View {
-        ZStack(alignment: .top) {
-            ScrollView(.vertical) {
-                pageBody
-                    .padding(.horizontal, SettingsMetrics.contentHorizontalPadding)
-                    .padding(.top, SettingsMetrics.headerHeight + 8)
-                    .padding(.bottom, 30)
-                    // Without an explicit top alignment the scroll view
-                    // centers short pages vertically, leaving a large gap
-                    // between the header and the first row.
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-
-            header
+        ScrollView(.vertical) {
+            pageBody
+                .padding(.horizontal, SettingsMetrics.contentHorizontalPadding)
+                .padding(.top, SettingsMetrics.headerHeight + 4)
+                .padding(.bottom, SettingsMetrics.pageBottomInset)
+                // Without an explicit top alignment the scroll view
+                // centers short pages vertically, leaving a large gap
+                // between the header and the first row.
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .overlay(alignment: .top) { header }
+        .overlay(alignment: .bottom) {
+            SettingsTabBar(
+                selection: $selection,
+                isDebugSectionRevealed: environment.isDebugSectionRevealed
+            )
+            .padding(.bottom, SettingsMetrics.tabBarBottomInset)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onPreferenceChange(HeaderTrailingActionKey.self) { headerTrailingAction = $0 }
     }
 
+    /// Leading side stays empty — the window's real traffic lights are drawn
+    /// there by AppKit (see WindowConfiguringView). Fully transparent; see
+    /// the note on `SettingsMetrics.headerHeight`.
     private var header: some View {
         HStack(spacing: 8) {
-            SettingsTabIconBadge(
-                icon: selection.icon,
-                gradientColors: selection.badgeGradientColors,
-                size: SettingsMetrics.headerIconBadgeSize,
-                cornerRadius: SettingsMetrics.headerIconBadgeCornerRadius,
-                iconSize: SettingsMetrics.headerIconBadgeGlyphSize
-            )
-            Text(selection.title)
-                .font(SettingsMetrics.contentTitleFont)
-                .foregroundStyle(SettingsMetrics.textPrimary)
             Spacer()
 
             if let headerTrailingAction {
@@ -172,16 +114,22 @@ struct SettingsWindowView: View {
                     Image(systemName: "arrow.trianglehead.clockwise.rotate.90")
                         .font(.system(size: 13))
                         .foregroundStyle(SettingsMetrics.textPrimary)
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
+                        .frame(width: SettingsMetrics.headerButtonHeight, height: SettingsMetrics.headerButtonHeight)
+                        .background(Circle().fill(SettingsMetrics.rowColor))
+                        .overlay(
+                            Circle()
+                                .strokeBorder(SettingsMetrics.rowBorder, lineWidth: SettingsMetrics.rowBorderWidth)
+                        )
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .help("Refresh camera list")
             }
+
+            SessionLockButton(pocController: environment.pocController)
         }
-        .padding(.horizontal, SettingsMetrics.contentHorizontalPadding + 4)
-        .padding(.top, 10)
-        .frame(height: SettingsMetrics.headerHeight, alignment: .leading)
+        .padding(.horizontal, SettingsMetrics.contentHorizontalPadding)
+        .frame(height: SettingsMetrics.headerHeight)
     }
 
     @ViewBuilder

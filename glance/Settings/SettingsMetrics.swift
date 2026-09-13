@@ -9,68 +9,64 @@
 import SwiftUI
 
 enum SettingsMetrics {
-    static let windowSize = CGSize(width: 620, height: 650)
+    static let windowSize = CGSize(width: 520, height: 650)
     /// No `outerCornerRadius` token — the window's outer corner is AppKit's
     /// own native mask (see WindowConfiguringView), not a hardcoded clip.
     ///
-    /// Vertical strip at the top of the sidebar left empty for the window's
-    /// real traffic lights, which AppKit draws over our content.
-    static let trafficLightBandHeight: CGFloat = 52
-    static let contentCornerRadius: CGFloat = 19
-    static let sidebarWidth: CGFloat = 190
+    /// Strip across the top of the window: AppKit draws the real traffic
+    /// lights in it on the leading side, the session lock button sits on
+    /// the trailing side.
+    ///
+    /// No blur or scrim sits behind the header — every tint/blur approach
+    /// tried either read as an "extra white band" or couldn't render inside
+    /// SwiftUI's hosting view over native controls. Don't re-attempt without
+    /// an explicit ask.
+    static let headerHeight: CGFloat = 52
+    static let headerButtonHeight: CGFloat = 30
+    static let headerButtonFont = Font.system(size: 13, weight: .medium)
 
-    /// Solid, not translucent, so it reads as an opaque card rather than
-    /// picking up bleed-through from `VisualEffectView`'s materials.
-    static let contentBackgroundColor = adaptiveColor(
-        dark: NSColor(red: 0x10 / 255, green: 0x10 / 255, blue: 0x10 / 255, alpha: 0.25),
-        light: NSColor(white: 1, alpha: 0.25)
-    )
-
-    /// Same per-appearance color as the content panel, but translucent, so
-    /// the sidebar reads as a distinct layer over `VisualEffectView`'s blur.
-    static let sidebarBackgroundColor = adaptiveColor(
+    /// Tint over `VisualEffectView`'s `.sidebar` material, which spans the
+    /// whole window. Clear in both appearances — the material alone is the
+    /// look — but kept as the one place to tune it.
+    static let windowTintColor = adaptiveColor(
         dark: NSColor(red: 0x37 / 255, green: 0x37 / 255, blue: 0x37 / 255, alpha: 0),
         light: NSColor(red: 0xFF / 255, green: 0xFF / 255, blue: 0xFF / 255, alpha: 0)
     )
 
-    /// Gap between the content panel and every window edge — including the
-    /// sidebar seam — now that the panel floats as its own card instead of
-    /// sitting flush against the window frame.
-    static let contentOuterSpacing: CGFloat = 8
-    static let contentShadowColor = Color.black.opacity(0.2)
-    static let contentShadowRadius: CGFloat = 8
-    /// Opaque fill for the panel's shadow-casting underlay, so the drop
-    /// shadow follows the card outline instead of every row's silhouette.
-    static let contentShadowFill = adaptiveColor(
-        dark: NSColor(red: 0x10 / 255, green: 0x10 / 255, blue: 0x10 / 255, alpha: 0.2),
-        light: NSColor(white: 1, alpha: 0.2)
-    )
+    // MARK: - Tab bar
+    //
+    // Floating pill pinned to the bottom edge, above the scrolling page. Same
+    // `.sidebar` material as the window, blended within-window so it blurs
+    // the rows passing beneath it, plus `tabBarTint` to lift it a touch.
 
-    /// A hairline edge around the content panel — an actual grey in both
-    /// appearances, unlike `rowBorder`/`selectedPillColor` elsewhere, which
-    /// fake "grey" via a translucent black or white tint.
-    static let contentStrokeColor = adaptiveColor(
-        dark: NSColor(white: 0.5, alpha: 0.3),
-        light: NSColor(white: 0.5, alpha: 0.3)
+    static let tabBarHeight: CGFloat = 48
+    static let tabBarBottomInset: CGFloat = 14
+    /// Gap between the bar's edge and the first/last item's own padding.
+    static let tabBarHorizontalPadding: CGFloat = 5
+    static let tabBarTint = adaptiveColor(
+        dark: NSColor(white: 1, alpha: 0.07),
+        light: NSColor(white: 1, alpha: 0.35)
     )
-
-    static let selectedPillRadius: CGFloat = 11
-    /// Light mode flips the tint direction from dark mode's lightness to a
-    /// touch of darkness, since a white tint is invisible over the light fill.
+    static let tabBarBorder = adaptiveColor(
+        dark: NSColor(white: 1, alpha: 0.08),
+        light: NSColor(white: 0, alpha: 0.08)
+    )
+    static let tabItemHeight: CGFloat = 38
+    static let tabItemHorizontalPadding: CGFloat = 11
+    /// Roomier than `tabItemHorizontalPadding` once the title shows.
+    static let selectedTabItemHorizontalPadding: CGFloat = 14
+    static let tabGlyphSize: CGFloat = 15
+    static let tabTitleFont = Font.system(size: 13, weight: .medium)
+    /// The highlight pill behind the selected tab. Light mode goes whiter
+    /// rather than darker so it reads as a raised layer on the light bar.
     static let selectedPillColor = adaptiveColor(
-        dark: NSColor(white: 1, alpha: 0.06),
-        light: NSColor(white: 1, alpha: 0.4)
+        dark: NSColor(white: 1, alpha: 0.1),
+        light: NSColor(white: 1, alpha: 0.7)
     )
+    static let tabSelectionAnimation = Animation.spring(response: 0.35, dampingFraction: 0.82)
 
-    static let sidebarItemHeight: CGFloat = 36
-    static let sidebarSectionSpacing: CGFloat = 8
-    /// Deliberately asymmetric: pulled in on the right to visually balance
-    /// against the left at equal insets.
-    static let sidebarContentLeadingInset: CGFloat = 12
-    static let sidebarContentTrailingInset: CGFloat = 2
-    static let sidebarItemFont = Font.system(size: 13, weight: .regular)
-    static let sectionHeaderFont = Font.system(size: 13, weight: .medium)
-    static let contentTitleFont = Font.system(size: 15, weight: .medium)
+    /// Extra scroll room below a page's last row so it can clear the tab bar.
+    static let pageBottomInset: CGFloat = tabBarHeight + tabBarBottomInset + 16
 
     /// Light-mode values match the exact resolved alpha AppKit's own
     /// `NSColor.labelColor`/`.secondaryLabelColor` use (`black @ 0.85`/`0.50`),
@@ -90,8 +86,8 @@ enum SettingsMetrics {
 
     static let rowHeight: CGFloat = 44
     static let rowRadius: CGFloat = 16
-    /// Same tint-flip logic as `selectedPillColor` — light mode goes
-    /// slightly darker than the page instead of lighter.
+    /// Light mode goes slightly darker than the page instead of lighter,
+    /// since a white tint is invisible over the light material.
     static let rowColor = adaptiveColor(
         dark: NSColor(white: 1, alpha: 0.08),
         light: NSColor(white: 1, alpha: 0.75)
@@ -127,9 +123,10 @@ enum SettingsMetrics {
     /// Taller card used by multi-option pickers (e.g. Unlock Animation).
     static let optionCardVerticalPadding: CGFloat = 14
     static let optionPreviewHeight: CGFloat = 58
-    /// Taller variant for `UnlockAnimationPicker` — its artwork needs real
-    /// room to read as an actual pill/panel shape, not a small swatch.
-    static let unlockAnimationPreviewHeight: CGFloat = 108
+    /// Fixed-size tiles for pickers that share their row with a leading
+    /// title (`SettingsLabeledOptionRow`) instead of spanning the card.
+    static let triggerOptionPreviewSize = CGSize(width: 70, height: 44)
+    static let unlockAnimationOptionPreviewSize = CGSize(width: 112, height: 76)
     static let optionPreviewCornerRadius: CGFloat = 13
     static let optionPreviewFill = adaptiveColor(
         dark: NSColor(white: 1, alpha: 0.05),
@@ -163,22 +160,9 @@ enum SettingsMetrics {
     static let sectionTitleHorizontalInset: CGFloat = 10
     static let sectionTitleVerticalPadding: CGFloat = 8
 
-    static let contentHorizontalPadding: CGFloat = 16
-
-    // MARK: - Tab icon badges
-    //
-    // The small colored squircle behind each tab's glyph. Corner radius is
-    // kept proportional to size (~28%, matching macOS's own rounded-square
-    // icon tiles) so both sizes read as the same shape.
-
-    static let sidebarIconBadgeSize: CGFloat = 23
-    static let sidebarIconBadgeCornerRadius: CGFloat = 7
-    static let sidebarIconBadgeGlyphSize: CGFloat = 13.5
-
-    static let headerIconBadgeSize: CGFloat = 23
-    static let headerIconBadgeCornerRadius: CGFloat = 7
-    static let headerIconBadgeGlyphSize: CGFloat = 13.5
-
+    /// Page content's inset from the window's side edges; the header's
+    /// trailing button lines up with it.
+    static let contentHorizontalPadding: CGFloat = 20
 
     // MARK: - Capture-quality tick strip (Your Face)
     //
@@ -204,13 +188,6 @@ enum SettingsMetrics {
     static let qualityStripMaxWidth: CGFloat = 250
 
     static let buttonBackgroundColor = Color(red: 0x3F / 255, green: 0x3F / 255, blue: 0x3F / 255)
-
-    static let headerHeight: CGFloat = 40
-
-    /// No blur or scrim sits behind the header — every tint/blur approach
-    /// tried either read as an "extra white band" or couldn't render inside
-    /// SwiftUI's hosting view over native controls. Don't re-attempt without
-    /// an explicit ask.
 
     /// Resolves live against the current system appearance rather than a
     /// value fixed at evaluation time.

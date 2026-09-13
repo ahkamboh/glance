@@ -19,61 +19,6 @@ enum SettingsTabIcon {
     case asset(String)
 }
 
-/// The colored rounded-squircle tile behind a tab's glyph — the same
-/// per-category icon treatment macOS System Settings uses. Used at two
-/// sizes (`SettingsSidebar`'s row and `SettingsWindowView`'s page header),
-/// hence the explicit size/cornerRadius/iconSize parameters.
-struct SettingsTabIconBadge: View {
-    let icon: SettingsTabIcon
-    /// Read top-to-bottom — `[topColor, bottomColor]`; a flat tile just lists the same color twice.
-    let gradientColors: [Color]
-    let size: CGFloat
-    let cornerRadius: CGFloat
-    let iconSize: CGFloat
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(LinearGradient(colors: gradientColors, startPoint: .top, endPoint: .bottom))
-            .frame(width: size, height: size)
-            .overlay(glyph)
-            // Same two-ring treatment as `SettingsOptionTile`'s preview tiles.
-            .overlay(
-                RoundedRectangle(
-                    cornerRadius: cornerRadius + SettingsMetrics.optionPreviewOuterStrokeWidth,
-                    style: .continuous
-                )
-                .strokeBorder(
-                    SettingsMetrics.optionPreviewOuterStroke,
-                    lineWidth: SettingsMetrics.optionPreviewOuterStrokeWidth
-                )
-                .padding(-SettingsMetrics.optionPreviewOuterStrokeWidth)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(SettingsMetrics.rowBorder, lineWidth: SettingsMetrics.optionPreviewBorderWidth)
-            )
-    }
-
-    @ViewBuilder
-    private var glyph: some View {
-        switch icon {
-        case .system(let name):
-            Image(systemName: name)
-                .font(.system(size: iconSize, weight: .medium))
-                .foregroundStyle(.white)
-        case .asset(let name):
-            // Marked `template-rendering-intent: template`, so AppKit fills
-            // it from `.foregroundStyle` using the source art's alpha as a mask.
-            Image(name)
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .foregroundStyle(.white)
-                .frame(width: iconSize, height: iconSize)
-        }
-    }
-}
-
 /// Small "i" glyph that reveals a short explanation in a native popover on
 /// tap. Drop it next to a row's title (see `SettingsRowContent.info`) or
 /// standalone anywhere a setting needs a one-line explanation.
@@ -174,12 +119,14 @@ struct SettingsGroup<Content: View>: View {
     }
 }
 
-/// Full-bleed hairline between rows inside a `SettingsGroup`.
+/// Hairline between rows inside a `SettingsGroup`, inset to line up with
+/// the rows' own text and trailing controls rather than the card's edges.
 struct SettingsGroupDivider: View {
     var body: some View {
         Rectangle()
             .fill(SettingsMetrics.rowBorder)
             .frame(height: SettingsMetrics.rowBorderWidth)
+            .padding(.horizontal, SettingsMetrics.rowHorizontalInset)
     }
 }
 
@@ -497,6 +444,43 @@ struct SettingsOptionCard<Content: View>: View {
     }
 }
 
+/// A title (+ optional subtitle) on the leading edge and a trailing run of
+/// fixed-width `SettingsOptionTile`s — for pickers compact enough to share
+/// a row with their label. Drop directly inside a `SettingsGroup`.
+struct SettingsLabeledOptionRow<Content: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        // Top-aligned, and the vertical padding puts the title's first line
+        // where a single-line `SettingsRowContent`'s title sits.
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(SettingsMetrics.rowFont)
+                    .foregroundStyle(SettingsMetrics.textPrimary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(SettingsMetrics.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.trailing, 12)
+
+            HStack(alignment: .top, spacing: SettingsMetrics.optionItemSpacing) {
+                content()
+            }
+            // Tiles keep their size; a long subtitle wraps instead.
+            .layoutPriority(1)
+        }
+        .padding(.horizontal, SettingsMetrics.rowHorizontalInset)
+        .padding(.vertical, SettingsMetrics.optionCardVerticalPadding)
+    }
+}
+
 /// One selectable preview tile: artwork on a filled rounded rect, a label
 /// beneath, and an accent ring when selected. Selection is just a `Bool`, so
 /// this serves single-select and multi-select pickers alike.
@@ -506,8 +490,11 @@ struct SettingsOptionTile<Preview: View>: View {
     let action: () -> Void
     /// Defaults to the standard swatch height every other option picker
     /// uses; `UnlockAnimationPicker` passes a taller value so its artwork
-    /// has real room — see `SettingsMetrics.unlockAnimationPreviewHeight`.
+    /// has real room — see `SettingsMetrics.unlockAnimationOptionPreviewSize`.
     var previewHeight: CGFloat = SettingsMetrics.optionPreviewHeight
+    /// `nil` shares the row's width equally with sibling tiles; a value
+    /// pins it, for tiles in a `SettingsLabeledOptionRow`.
+    var previewWidth: CGFloat? = nil
     @ViewBuilder var preview: () -> Preview
 
     /// Tint for artwork drawn as plain shapes, so tiles that don't supply
@@ -522,7 +509,8 @@ struct SettingsOptionTile<Preview: View>: View {
         Button(action: action) {
             VStack(spacing: 8) {
                 preview()
-                    .frame(maxWidth: .infinity)
+                    .frame(width: previewWidth)
+                    .frame(maxWidth: previewWidth == nil ? .infinity : nil)
                     .frame(height: previewHeight)
                     .background {
                         SettingsMetrics.optionPreviewFill
@@ -583,7 +571,7 @@ struct SettingsOptionTile<Preview: View>: View {
                     .font(SettingsMetrics.optionLabelFont)
                     .foregroundStyle(isSelected ? SettingsMetrics.textPrimary : SettingsMetrics.textSecondary)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: previewWidth == nil ? .infinity : nil)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -601,13 +589,17 @@ struct UnlockAnimationPicker: View {
     private static let previewHoldDuration: Duration = .seconds(1.5)
 
     var body: some View {
-        SettingsOptionRow {
+        SettingsLabeledOptionRow(
+            title: "Style",
+            subtitle: "The animation that appears when unlocking your Mac"
+        ) {
             ForEach(UnlockAnimationStyle.selectableCases) { style in
                 SettingsOptionTile(
                     title: style.title,
                     isSelected: selection == style,
                     action: { selectAndPreview(style) },
-                    previewHeight: SettingsMetrics.unlockAnimationPreviewHeight
+                    previewHeight: SettingsMetrics.unlockAnimationOptionPreviewSize.height,
+                    previewWidth: SettingsMetrics.unlockAnimationOptionPreviewSize.width
                 ) {
                     preview(for: style, isSelected: selection == style)
                 }
@@ -638,29 +630,29 @@ struct UnlockAnimationPicker: View {
         case .minimal:
             // Inset on both sides so the margin implies "small detached
             // capsule" in the absence of the real notch's surrounding chrome.
-            HStack(spacing: 10) {
+            HStack(spacing: 6) {
                 Image(systemName: "lock.fill")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white)
-                Spacer(minLength: 8)
+                Spacer(minLength: 6)
                 UnlockStillThumbnail()
-                    .frame(width: 24, height: 24)
+                    .frame(width: 18, height: 18)
             }
-            .padding(.horizontal, 14)
-            .frame(height: 38)
+            .padding(.horizontal, 10)
+            .frame(height: 28)
             .background(Color.black, in: Capsule(style: .continuous))
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
         case .original:
             // Fills the tile edge-to-edge, no inset — matches how the real
             // style expands to fill the whole panel.
             VStack {
             UnlockStillThumbnail()
-                .padding(14)
+                .padding(10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             // .padding(4)
-            .background(Color.black, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .frame(width: 85, height: 85)
+            .background(Color.black, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+            .frame(width: 60, height: 60)
         case .none:
             // Not offered as a tile — `showUnlockAnimation` covers it.
             EmptyView()
@@ -729,16 +721,18 @@ struct UnlockTriggerPicker: View {
     var isEnabled: Bool = true
 
     var body: some View {
-        SettingsOptionRow {
+        SettingsLabeledOptionRow(title: "Triggers", subtitle: "Select multiple") {
             ForEach(UnlockTrigger.allCases) { trigger in
                 let isSelected = selection.contains(trigger)
                 SettingsOptionTile(
                     title: trigger.title,
                     isSelected: isSelected,
-                    action: { toggle(trigger, isSelected: isSelected) }
+                    action: { toggle(trigger, isSelected: isSelected) },
+                    previewHeight: SettingsMetrics.triggerOptionPreviewSize.height,
+                    previewWidth: SettingsMetrics.triggerOptionPreviewSize.width
                 ) {
                     Image(systemName: trigger.iconName)
-                        .font(.system(size: 20, weight: .regular))
+                        .font(.system(size: 16, weight: .regular))
                         .foregroundStyle(SettingsOptionTile<EmptyView>.previewTint(isSelected: isSelected))
                 }
             }
@@ -758,7 +752,8 @@ struct UnlockTriggerPicker: View {
     }
 }
 
-/// Wraps an `NSVisualEffectView` for the window's background blur.
+/// Wraps an `NSVisualEffectView` for the window's background blur, and the
+/// tab bar's within-window blur (`cornerRadius` masks it to a capsule).
 ///
 /// `.sidebar`, not `.hudWindow` — Apple's own purpose-built material for
 /// this element (Finder/Mail/Xcode sidebars), reading as a properly light,
@@ -767,6 +762,9 @@ struct UnlockTriggerPicker: View {
 struct VisualEffectView: NSViewRepresentable {
     var material: NSVisualEffectView.Material = .sidebar
     var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
+    /// Masks the material itself via `maskImage` — a SwiftUI `clipShape`
+    /// isn't reliably applied to the backing `NSView`. `0` leaves it square.
+    var cornerRadius: CGFloat = 0
 
     /// `CALayer.filters` is the property that actually reaches this view's
     /// rendered content (confirmed empirically — `.backgroundFilters` moved
@@ -793,6 +791,7 @@ struct VisualEffectView: NSViewRepresentable {
         // material on permanently, so the window stays translucent even
         // when it's neither key nor main.
         view.state = .followsWindowActiveState
+        view.maskImage = Self.maskImage(cornerRadius: cornerRadius)
         view.wantsLayer = true
         view.lightFilter = Self.lightSaturationFilter
         view.darkFilter = Self.darkSaturationFilter
@@ -803,6 +802,22 @@ struct VisualEffectView: NSViewRepresentable {
     func updateNSView(_ nsView: AppearanceAdaptiveVisualEffectView, context: Context) {
         nsView.material = material
         nsView.blendingMode = blendingMode
+        nsView.maskImage = Self.maskImage(cornerRadius: cornerRadius)
+    }
+
+    /// A stretchable rounded-rect mask: only the corners are drawn at their
+    /// real size, the cap insets stretch the middle to any view size.
+    private static func maskImage(cornerRadius: CGFloat) -> NSImage? {
+        guard cornerRadius > 0 else { return nil }
+        let edge = cornerRadius * 2 + 1
+        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: cornerRadius, left: cornerRadius, bottom: cornerRadius, right: cornerRadius)
+        image.resizingMode = .stretch
+        return image
     }
 }
 
