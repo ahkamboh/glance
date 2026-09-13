@@ -42,7 +42,7 @@ enum SettingsMetrics {
     static let tabBarHeight: CGFloat = 54
     static let tabBarBottomInset: CGFloat = 14
     /// Gap between the bar's edge and the first/last item's own padding.
-    static let tabBarHorizontalPadding: CGFloat = 5
+    static let tabBarHorizontalPadding: CGFloat = 6
     static let tabBarTint = adaptiveColor(
         dark: NSColor(white: 1, alpha: 0.15),
         light: NSColor(white: 1, alpha: 0.5)

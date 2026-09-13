@@ -34,6 +34,10 @@ struct glanceApp: App {
         }
         // Deliberately no `.windowResizability(.contentSize)`: it kept re-deriving the window size from the titlebar band,
         // growing the window whenever that band's height changed. Size is set once by WindowConfiguringView instead.
+        //
+        // Creates the window at its final size from the start. WindowConfiguringView only applies the size a runloop after
+        // the window first draws, so without this the first frame showed SwiftUI's own guess (much wider, much shorter).
+        .defaultSize(SettingsMetrics.windowSize)
         .windowStyle(.hiddenTitleBar)
         .defaultPosition(.center)
         .defaultLaunchBehavior(.suppressed)
