@@ -95,6 +95,56 @@ struct PermissionRow: View {
     }
 }
 
+/// The camera picker on the "Select camera" step: a full-width capsule row (same chrome
+/// as `PermissionRow`) holding a compact native pull-down, left-aligned — the same
+/// `Menu`/`.menuStyle(.borderlessButton)` construction as `CameraSettingsPage.cameraPicker`
+/// and `GeneralSettingsPage.displayPicker`. Stretching that construction to fill the whole
+/// row breaks its internal label layout; left hugging its own content, at the width those
+/// two already prove out, it behaves correctly.
+struct CameraSelectionPill: View {
+    let label: String
+    let devices: [CameraDevice]
+    let onSelect: (String?) -> Void
+
+    var body: some View {
+        HStack {
+            Menu {
+                Button("System default") { onSelect(nil) }
+                ForEach(devices) { device in
+                    Button(device.name) { onSelect(device.id) }
+                }
+            } label: {
+                Text(label)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(GlanceTheme.textPrimary)
+                    .font(.system(size: 12))
+                    .padding(.horizontal, 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .buttonStyle(.plain)
+            // Window-level accent tint otherwise paints the menu label blue.
+            .tint(GlanceTheme.textPrimary)
+            .frame(width: 220, height: 30)
+
+            Spacer(minLength: 0)
+
+            // Decorative only — the menu above is the actual tap target.
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(GlanceTheme.textSecondary)
+        }
+        .padding(.trailing, 16)
+        .frame(maxWidth: .infinity)
+        .frame(height: OnboardingMetrics.permissionRowHeight)
+        .background(GlanceTheme.surface)
+        .clipShape(Capsule())
+    }
+}
+
 /// The password entry field — a pill-shaped `SecureField`.
 struct PillSecureField: View {
     let placeholder: String

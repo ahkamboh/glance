@@ -22,6 +22,7 @@ enum OnboardingStep: String, CaseIterable {
     case permissions
     case securityNotice
     case preSetup
+    case selectCamera
     case enroll
     case name
     case password
@@ -37,7 +38,7 @@ enum OnboardingStep: String, CaseIterable {
     /// only, and complete/intro have just one side.
     var showsBackButton: Bool {
         switch self {
-        case .securityNotice, .permissions, .preSetup, .name, .password: return true
+        case .securityNotice, .permissions, .preSetup, .selectCamera, .name, .password: return true
         case .intro, .enroll, .complete: return false
         }
     }
@@ -49,7 +50,7 @@ enum OnboardingStep: String, CaseIterable {
     var resumeTarget: OnboardingStep {
         switch self {
         case .enroll, .name, .password: return .preSetup
-        case .intro, .securityNotice, .permissions, .preSetup, .complete: return self
+        case .intro, .securityNotice, .permissions, .preSetup, .selectCamera, .complete: return self
         }
     }
 }
@@ -530,7 +531,8 @@ final class OnboardingController {
                 case .intro: step = .permissions
                 case .permissions: step = .securityNotice
                 case .securityNotice: step = .preSetup
-                case .preSetup: step = .enroll
+                case .preSetup: step = .selectCamera
+                case .selectCamera: step = .enroll
                 case .enroll: break // advances automatically on completion
                 case .name: break // handled by confirmName()
                 case .password: break // handled by finish(password:)
@@ -579,7 +581,7 @@ final class OnboardingController {
             resetEnrollmentState()
             camera.stop()
             sweepWindow.dismiss()
-            withAnimation(OnboardingMetrics.stepAnimation) { step = .preSetup }
+            withAnimation(OnboardingMetrics.stepAnimation) { step = .selectCamera }
         case .password:
             // Deliberately *without* resetting: samples and typed name survive so a typo
             // fix doesn't mean re-doing nine poses.
@@ -592,7 +594,7 @@ final class OnboardingController {
         case .name:
             // `.enroll` can't be resumed halfway, so backing past it discards the capture.
             resetEnrollmentState()
-            withAnimation(OnboardingMetrics.stepAnimation) { step = .preSetup }
+            withAnimation(OnboardingMetrics.stepAnimation) { step = .selectCamera }
         default:
             guard let previous = step.previous else { return }
             withAnimation(OnboardingMetrics.stepAnimation) { step = previous }
@@ -684,6 +686,68 @@ final class OnboardingController {
     private func openSystemSettings(pane: String) {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    // MARK: - Camera selection
+
+    /// Devices offered by the picker — refreshed when the step appears, since a camera
+    /// can be plugged in after the app launched.
+    private(set) var cameraDevices: [CameraDevice] = []
+
+    func refreshCameraDevices() {
+        cameraDevices = CameraDeviceCatalog.availableDevices()
+    }
+
+    /// Text shown inside the pill: the explicitly chosen device's name, or the resolved
+    /// system default's name suffixed "(Default)" when nothing's been picked yet.
+    var cameraSelectionLabel: String {
+        if let id = GlanceSettings.shared.defaultCameraID,
+           let device = cameraDevices.first(where: { $0.id == id }) {
+            return device.name
+        }
+        guard let name = resolveDefaultCameraDevice()?.localizedName else { return "System default" }
+        return "\(name) (Default)"
+    }
+
+    /// Writes the pick straight into Settings — the same `defaultCameraID` the Camera
+    /// settings page and `CameraDeviceCatalog.resolvedDevice()` read — then re-checks
+    /// whether the panel should follow the built-in display.
+    func selectCamera(id: String?) {
+        GlanceSettings.shared.defaultCameraID = id
+        applyDisplayPinForCameraSelection()
+    }
+
+    /// Pins the Face Unlock panel to the MacBook's own screen while the built-in camera
+    /// is selected (auto-resolved or explicitly chosen), and releases that pin otherwise
+    /// so the panel returns to the user's normal (often external-monitor) screen. Only
+    /// meaningful with more than one screen connected — nothing to move on just one.
+    /// Called whenever the pick changes and again when the step first appears, so an
+    /// untouched system-default choice that happens to resolve to the built-in camera
+    /// still moves the panel.
+    func applyDisplayPinForCameraSelection() {
+        guard NSScreen.screens.count > 1 else { return }
+        let isBuiltIn = resolveSelectedCameraDevice()?.deviceType == .builtInWideAngleCamera
+        if isBuiltIn {
+            guard let builtInScreen = NSScreen.screens.first(where: { $0.isBuiltIn }) else { return }
+            GlanceSettings.shared.preferredDisplayID = builtInScreen.stableDisplayID
+            GlanceSettings.shared.preferredDisplayName = builtInScreen.localizedName
+        } else {
+            GlanceSettings.shared.preferredDisplayID = nil
+            GlanceSettings.shared.preferredDisplayName = nil
+        }
+    }
+
+    private func resolveSelectedCameraDevice() -> AVCaptureDevice? {
+        if let id = GlanceSettings.shared.defaultCameraID {
+            return AVCaptureDevice(uniqueID: id)
+        }
+        return resolveDefaultCameraDevice()
+    }
+
+    /// Same fallback `CameraDeviceCatalog.resolvedDevice()` uses once no override applies.
+    private func resolveDefaultCameraDevice() -> AVCaptureDevice? {
+        AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+            ?? AVCaptureDevice.default(for: .video)
     }
 
     // MARK: - Guided enrollment

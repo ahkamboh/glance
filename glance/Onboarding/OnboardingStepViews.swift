@@ -191,7 +191,56 @@ private struct UnlockGlyphView: View {
     }
 }
 
-// MARK: - 5-7. Guided enrollment (camera + tick ring + camera-complete)
+// MARK: - 5. Select camera
+
+struct SelectCameraStepView: View {
+    let controller: OnboardingController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Select camera")
+                .font(GlanceTheme.Font.title)
+                .foregroundStyle(GlanceTheme.textPrimary)
+                .padding(.leading, 4)
+                .padding(.top, 14)
+
+            Text("Used for Face enrollment and for unlocking your Mac")
+                .font(GlanceTheme.Font.passwordCaption)
+                .foregroundStyle(GlanceTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 4)
+
+            Spacer(minLength: 2)
+
+            CameraSelectionPill(
+                label: controller.cameraSelectionLabel,
+                devices: controller.cameraDevices
+            ) { id in
+                controller.selectCamera(id: id)
+            }
+
+            Spacer(minLength: 4)
+
+            HStack(spacing: 10) {
+                PillButton(title: "Back", style: .secondary) {
+                    controller.back()
+                }
+                PillButton(title: "Next") {
+                    controller.advance()
+                }
+            }
+        }
+        .onboardingContentPadding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(GlanceTheme.panel)
+        .onAppear {
+            controller.refreshCameraDevices()
+            controller.applyDisplayPinForCameraSelection()
+        }
+    }
+}
+
+// MARK: - 6-8. Guided enrollment (camera + tick ring + camera-complete)
 
 struct EnrollStepView: View {
     let controller: OnboardingController
@@ -318,7 +367,7 @@ private struct EnrollmentTooFarChevron: View {
     }
 }
 
-// MARK: - 8. Name
+// MARK: - 9. Name
 
 /// Asks who was just captured — for a recapture, pre-filled with the existing name so
 /// this doubles as rename.
@@ -370,7 +419,7 @@ struct NameStepView: View {
     }
 }
 
-// MARK: - 9. Password
+// MARK: - 10. Password
 
 struct PasswordStepView: View {
     let controller: OnboardingController
@@ -424,7 +473,7 @@ struct PasswordStepView: View {
     }
 }
 
-// MARK: - 10. Complete
+// MARK: - 11. Complete
 
 struct CompleteStepView: View {
     var body: some View {
