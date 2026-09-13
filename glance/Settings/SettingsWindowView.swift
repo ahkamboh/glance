@@ -90,7 +90,15 @@ struct SettingsWindowView: View {
                 // between the header and the first row.
                 .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .overlay(alignment: .top) { header }
+        .overlay(alignment: .top) {
+            // Blur first, header content on top — so it fades whatever
+            // scrolls beneath both without ever softening the buttons
+            // themselves.
+            ZStack(alignment: .top) {
+                ProgressiveHeaderBlur(height: SettingsMetrics.headerBlurHeight)
+                header
+            }
+        }
         .overlay(alignment: .bottom) {
             SettingsTabBar(
                 selection: $selection,
@@ -103,8 +111,8 @@ struct SettingsWindowView: View {
     }
 
     /// Leading side stays empty — the window's real traffic lights are drawn
-    /// there by AppKit (see WindowConfiguringView). Fully transparent; see
-    /// the note on `SettingsMetrics.headerHeight`.
+    /// there by AppKit (see WindowConfiguringView). No background of its
+    /// own; `ProgressiveHeaderBlur` sits behind it in `contentPage`.
     private var header: some View {
         HStack(spacing: 8) {
             Spacer()

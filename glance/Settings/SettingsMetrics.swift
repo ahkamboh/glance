@@ -17,13 +17,13 @@ enum SettingsMetrics {
     /// lights in it on the leading side, the session lock button sits on
     /// the trailing side.
     ///
-    /// No blur or scrim sits behind the header — every tint/blur approach
-    /// tried either read as an "extra white band" or couldn't render inside
-    /// SwiftUI's hosting view over native controls. Don't re-attempt without
-    /// an explicit ask.
     static let headerHeight: CGFloat = 52
     static let headerButtonHeight: CGFloat = 30
     static let headerButtonFont = Font.system(size: 13, weight: .medium)
+
+    /// Taller than `headerHeight` so the blur has room to fade all the way
+    /// to nothing before the first row, rather than getting cut off mid-fade.
+    static let headerBlurHeight: CGFloat = headerHeight + 28
 
     /// Tint over `VisualEffectView`'s `.sidebar` material, which spans the
     /// whole window. Clear in both appearances — the material alone is the
