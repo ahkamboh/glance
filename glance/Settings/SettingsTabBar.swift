@@ -132,11 +132,15 @@ private struct SettingsTabGlyph: View {
             case .asset(let name):
                 // Marked `template-rendering-intent: template`, so AppKit fills
                 // it from `.foregroundStyle` using the source art's alpha as a mask.
+                // A touch larger and nudged down — the Face mark's own
+                // artwork reads slightly smaller/higher than the system
+                // glyphs at the same box size.
                 Image(name)
                     .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: SettingsMetrics.tabGlyphSize - 1, height: SettingsMetrics.tabGlyphSize - 1)
+                    .frame(width: SettingsMetrics.tabGlyphSize + 1, height: SettingsMetrics.tabGlyphSize + 1)
+                    .offset(y: 1)
             }
         }
         // Fixed box so glyphs of different widths space evenly along the bar.

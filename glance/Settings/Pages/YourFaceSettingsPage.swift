@@ -284,13 +284,20 @@ private struct IdentityCard: View {
         identity.samples.filter { $0.qualityTier != .unrated }.count
     }
 
-    /// "3/18 low" counts only the red band. An enrollment saved before
-    /// per-sample quality existed reports "not recorded" rather than a
-    /// misleading "0/18 low".
+    /// Share of samples that *aren't* in the red band, e.g. 3 low out of 18
+    /// samples is 15/18 good → 83%.
+    private var qualityPercentage: Int {
+        let total = identity.samples.count
+        guard total > 0 else { return 0 }
+        return Int((Double(total - poorCount) / Double(total) * 100).rounded())
+    }
+
+    /// An enrollment saved before per-sample quality existed reports "not
+    /// recorded" rather than a misleading 100%.
     private var qualityCaption: String {
         if identity.samples.isEmpty { return "No samples captured" }
         if ratedCount == 0 { return "Capture quality • not recorded" }
-        return "Capture quality • \(poorCount)/\(identity.samples.count) low"
+        return "Capture quality • \(qualityPercentage)%"
     }
 
     var body: some View {
