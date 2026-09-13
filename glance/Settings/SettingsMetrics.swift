@@ -9,7 +9,7 @@
 import SwiftUI
 
 enum SettingsMetrics {
-    static let windowSize = CGSize(width: 520, height: 650)
+    static let windowSize = CGSize(width: 500, height: 620)
     /// No `outerCornerRadius` token — the window's outer corner is AppKit's
     /// own native mask (see WindowConfiguringView), not a hardcoded clip.
     ///
@@ -39,29 +39,32 @@ enum SettingsMetrics {
     // `.sidebar` material as the window, blended within-window so it blurs
     // the rows passing beneath it, plus `tabBarTint` to lift it a touch.
 
-    static let tabBarHeight: CGFloat = 48
+    static let tabBarHeight: CGFloat = 54
     static let tabBarBottomInset: CGFloat = 14
     /// Gap between the bar's edge and the first/last item's own padding.
     static let tabBarHorizontalPadding: CGFloat = 5
     static let tabBarTint = adaptiveColor(
-        dark: NSColor(white: 1, alpha: 0.07),
-        light: NSColor(white: 1, alpha: 0.35)
+        dark: NSColor(white: 1, alpha: 0.15),
+        light: NSColor(white: 1, alpha: 0.5)
     )
     static let tabBarBorder = adaptiveColor(
-        dark: NSColor(white: 1, alpha: 0.08),
+        dark: NSColor(white: 1, alpha: 0.16),
         light: NSColor(white: 0, alpha: 0.08)
     )
-    static let tabItemHeight: CGFloat = 38
+    static let tabItemHeight: CGFloat = 42
     static let tabItemHorizontalPadding: CGFloat = 11
-    /// Roomier than `tabItemHorizontalPadding` once the title shows.
     static let selectedTabItemHorizontalPadding: CGFloat = 14
     static let tabGlyphSize: CGFloat = 15
     static let tabTitleFont = Font.system(size: 13, weight: .medium)
-    /// The highlight pill behind the selected tab. Light mode goes whiter
-    /// rather than darker so it reads as a raised layer on the light bar.
     static let selectedPillColor = adaptiveColor(
         dark: NSColor(white: 1, alpha: 0.1),
         light: NSColor(white: 1, alpha: 0.7)
+    )
+    /// Same treatment as `tabBarBorder`, one step subtler — the inner pill
+    /// reads as sitting on the outer one rather than a separate outline.
+    static let selectedPillBorder = adaptiveColor(
+        dark: NSColor(white: 1, alpha: 0.12),
+        light: NSColor(white: 0, alpha: 0.06)
     )
     static let tabSelectionAnimation = Animation.spring(response: 0.35, dampingFraction: 0.82)
     /// How far a tab's label slides toward its icon as it collapses away
@@ -172,7 +175,7 @@ enum SettingsMetrics {
 
     /// Page content's inset from the window's side edges; the header's
     /// trailing button lines up with it.
-    static let contentHorizontalPadding: CGFloat = 20
+    static let contentHorizontalPadding: CGFloat = 16
 
     // MARK: - Capture-quality tick strip (Your Face)
     //

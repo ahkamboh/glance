@@ -682,8 +682,7 @@ struct SettingsOptionTile<Preview: View>: View {
 }
 
 /// Unlock animation picker — connects, inside one `SettingsGroup`, to the
-/// "Show animation" toggle above it (see `GeneralSettingsPage`). Only the
-/// two visible styles are offered; `.none` is produced by that toggle.
+/// "Show animation" toggle above it (see `GeneralSettingsPage`).
 struct UnlockAnimationPicker: View {
     @Binding var selection: UnlockAnimationStyle
     var isEnabled: Bool = true
@@ -713,8 +712,7 @@ struct UnlockAnimationPicker: View {
     }
 
     /// Picks the tile (a re-tap replays the preview too) and plays that
-    /// style's real animation on the notch/pill via `styleOverride`, so it
-    /// always previews the tapped style rather than whatever's saved.
+    /// style's real animation on the notch/pill via `styleOverride`.
     private func selectAndPreview(_ style: UnlockAnimationStyle) {
         selection = style
         NotchOverlayController.shared.present(styleOverride: style)
@@ -725,14 +723,11 @@ struct UnlockAnimationPicker: View {
     }
 
     /// A black pill (minimal) or rounded panel (original), each showing the
-    /// real unlock animation's still frame, matching the real notch/pill
-    /// shapes closely enough to read as a preview rather than an abstract swatch.
+    /// real unlock animation's still frame
     @ViewBuilder
     private func preview(for style: UnlockAnimationStyle, isSelected: Bool) -> some View {
         switch style {
         case .minimal:
-            // Inset on both sides so the margin implies "small detached
-            // capsule" in the absence of the real notch's surrounding chrome.
             HStack(spacing: 6) {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 11, weight: .semibold))
@@ -746,8 +741,6 @@ struct UnlockAnimationPicker: View {
             .background(Color.black, in: Capsule(style: .continuous))
             .padding(.horizontal, 12)
         case .original:
-            // Fills the tile edge-to-edge, no inset — matches how the real
-            // style expands to fill the whole panel.
             VStack {
             UnlockStillThumbnail()
                 .padding(10)
@@ -755,18 +748,15 @@ struct UnlockAnimationPicker: View {
             }
             // .padding(4)
             .background(Color.black, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-            .frame(width: 60, height: 60)
+            .frame(width: 50, height: 50)
+            .padding(.vertical, 10)
         case .none:
-            // Not offered as a tile — `showUnlockAnimation` covers it.
             EmptyView()
         }
     }
 }
 
-/// The unlock animation's still poster frame (`unlockstatic.png`) as a
-/// plain SwiftUI `Image`. Deliberately not `ScanAnimationView` itself —
-/// that's an `AVPlayer`-backed view built to play video, which these
-/// static previews never need.
+
 private struct UnlockStillThumbnail: View {
     var body: some View {
         if let url = Bundle.main.url(forResource: "unlockstatic", withExtension: "png"),

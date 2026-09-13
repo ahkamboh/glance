@@ -8,12 +8,6 @@
 //
 
 import SwiftUI
-
-/// Each tab item's rendered frame, in the bar's own coordinate space — used
-/// to position the single highlight pill without relying on
-/// `matchedGeometryEffect`, which pops rather than slides when the view
-/// carrying the id is torn down and rebuilt on a different button in the
-/// same transaction (exactly what happens here every time selection changes).
 private struct TabFramePreferenceKey: PreferenceKey {
     static var defaultValue: [SettingsTab: CGRect] = [:]
     static func reduce(value: inout [SettingsTab: CGRect], nextValue: () -> [SettingsTab: CGRect]) {
@@ -35,12 +29,13 @@ struct SettingsTabBar: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            // One pill, moved and resized to the selected tab's measured
-            // frame — never removed/reinserted, so it always slides rather
-            // than popping to the new tab.
             if let frame = tabFrames[selection] {
                 Capsule()
                     .fill(SettingsMetrics.selectedPillColor)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(SettingsMetrics.selectedPillBorder, lineWidth: 1)
+                    )
                     .frame(width: frame.width, height: frame.height)
                     .offset(x: frame.minX, y: frame.minY)
                     .transition(.opacity)
@@ -56,9 +51,6 @@ struct SettingsTabBar: View {
         .padding(.horizontal, SettingsMetrics.tabBarHorizontalPadding)
         .frame(height: SettingsMetrics.tabBarHeight)
         .background {
-            // SwiftUI's own material — a real, layered frosted-glass blur of
-            // whatever scrolls underneath, unlike the flat/grey result the
-            // within-window `NSVisualEffectView` gave here.
             Capsule()
                 .fill(.regularMaterial)
             Capsule()
@@ -89,10 +81,6 @@ struct SettingsTabBar: View {
                         .font(SettingsMetrics.tabTitleFont)
                         .lineLimit(1)
                         .fixedSize()
-                        // Outgoing: slides left into the icon, fading and
-                        // blurring away. Incoming: starts from that same
-                        // position (as if unfurling from the icon) and
-                        // slides right into place while sharpening in.
                         .transition(.tabLabelReveal)
                 }
             }
@@ -101,7 +89,6 @@ struct SettingsTabBar: View {
                 ? SettingsMetrics.selectedTabItemHorizontalPadding
                 : SettingsMetrics.tabItemHorizontalPadding)
             .frame(height: SettingsMetrics.tabItemHeight)
-            // Without this, only the rendered glyph is hit-testable.
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -130,11 +117,6 @@ private struct SettingsTabGlyph: View {
                 Image(systemName: name)
                     .font(.system(size: SettingsMetrics.tabGlyphSize, weight: .medium))
             case .asset(let name):
-                // Marked `template-rendering-intent: template`, so AppKit fills
-                // it from `.foregroundStyle` using the source art's alpha as a mask.
-                // A touch larger and nudged down — the Face mark's own
-                // artwork reads slightly smaller/higher than the system
-                // glyphs at the same box size.
                 Image(name)
                     .renderingMode(.template)
                     .resizable()
@@ -150,7 +132,7 @@ private struct SettingsTabGlyph: View {
 
 /// A tab label's entrance/exit: it reads as unfurling from, and collapsing
 /// back into, the icon beside it — sliding along that edge while fading and
-/// blurring, rather than a plain crossfade in place.
+/// blurring.
 private struct TabLabelRevealModifier: ViewModifier {
     /// 1 = fully shown (identity); 0 = collapsed into the icon (active).
     var progress: CGFloat
@@ -165,8 +147,7 @@ private struct TabLabelRevealModifier: ViewModifier {
 
 private extension AnyTransition {
     /// One modifier transition (not `.asymmetric`) so insertion runs
-    /// active→identity and removal runs identity→active automatically —
-    /// exactly the symmetric slide-toward-the-icon motion wanted here.
+    /// active→identity and removal runs identity→active automatically.
     static var tabLabelReveal: AnyTransition {
         .modifier(
             active: TabLabelRevealModifier(progress: 0),
