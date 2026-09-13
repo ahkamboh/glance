@@ -752,8 +752,7 @@ struct UnlockTriggerPicker: View {
     }
 }
 
-/// Wraps an `NSVisualEffectView` for the window's background blur, and the
-/// tab bar's within-window blur (`cornerRadius` masks it to a capsule).
+/// Wraps an `NSVisualEffectView` for the window's background blur.
 ///
 /// `.sidebar`, not `.hudWindow` — Apple's own purpose-built material for
 /// this element (Finder/Mail/Xcode sidebars), reading as a properly light,
@@ -762,9 +761,6 @@ struct UnlockTriggerPicker: View {
 struct VisualEffectView: NSViewRepresentable {
     var material: NSVisualEffectView.Material = .sidebar
     var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
-    /// Masks the material itself via `maskImage` — a SwiftUI `clipShape`
-    /// isn't reliably applied to the backing `NSView`. `0` leaves it square.
-    var cornerRadius: CGFloat = 0
 
     /// `CALayer.filters` is the property that actually reaches this view's
     /// rendered content (confirmed empirically — `.backgroundFilters` moved
@@ -791,7 +787,6 @@ struct VisualEffectView: NSViewRepresentable {
         // material on permanently, so the window stays translucent even
         // when it's neither key nor main.
         view.state = .followsWindowActiveState
-        view.maskImage = Self.maskImage(cornerRadius: cornerRadius)
         view.wantsLayer = true
         view.lightFilter = Self.lightSaturationFilter
         view.darkFilter = Self.darkSaturationFilter
@@ -802,22 +797,6 @@ struct VisualEffectView: NSViewRepresentable {
     func updateNSView(_ nsView: AppearanceAdaptiveVisualEffectView, context: Context) {
         nsView.material = material
         nsView.blendingMode = blendingMode
-        nsView.maskImage = Self.maskImage(cornerRadius: cornerRadius)
-    }
-
-    /// A stretchable rounded-rect mask: only the corners are drawn at their
-    /// real size, the cap insets stretch the middle to any view size.
-    private static func maskImage(cornerRadius: CGFloat) -> NSImage? {
-        guard cornerRadius > 0 else { return nil }
-        let edge = cornerRadius * 2 + 1
-        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
-            NSColor.black.setFill()
-            NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
-            return true
-        }
-        image.capInsets = NSEdgeInsets(top: cornerRadius, left: cornerRadius, bottom: cornerRadius, right: cornerRadius)
-        image.resizingMode = .stretch
-        return image
     }
 }
 

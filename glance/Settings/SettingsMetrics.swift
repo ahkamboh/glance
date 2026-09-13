@@ -64,6 +64,11 @@ enum SettingsMetrics {
         light: NSColor(white: 1, alpha: 0.7)
     )
     static let tabSelectionAnimation = Animation.spring(response: 0.35, dampingFraction: 0.82)
+    /// How far a tab's label slides toward its icon as it collapses away
+    /// (or unfurls back out), in points.
+    static let tabLabelRevealOffset: CGFloat = 10
+    /// Max blur radius at the fully-collapsed end of the label reveal.
+    static let tabLabelRevealBlur: CGFloat = 4
 
     /// Extra scroll room below a page's last row so it can clear the tab bar.
     static let pageBottomInset: CGFloat = tabBarHeight + tabBarBottomInset + 16
