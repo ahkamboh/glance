@@ -149,6 +149,13 @@ final class NotchOverlayController {
         guard phase != .success, phase != .collapsing else { return }
         resolveTask?.cancel(); resolveTask = nil
         scanTimeoutTask?.cancel(); scanTimeoutTask = nil
+        // Re-measured here, not just trusted from `arm()` — `arm()` typically
+        // fires right around wake/unlock, when AppKit may not have finished
+        // laying out the menu bar yet, so `auxiliaryTopLeftArea`/`RightArea`
+        // can read back momentarily wrong. Refreshing right before settling
+        // to `.closed` (the shape most directly compared against the real
+        // notch) self-corrects instead of baking in a bad first reading.
+        geometry = windowController.currentGeometry
         phase = .closed
         content = .scan(.idle)
         windowController.setInteractive(false)
@@ -324,6 +331,9 @@ final class NotchOverlayController {
         try? await Task.sleep(for: collapseAnimationDuration)
         guard phase == .collapsing else { return }
 
+        // Same re-measure as `disarm()` — self-corrects a geometry captured
+        // during a mid-wake reading before the panel settles to `.closed`.
+        geometry = windowController.currentGeometry
         content = .scan(.idle)
         if isArmed {
             phase = .closed
