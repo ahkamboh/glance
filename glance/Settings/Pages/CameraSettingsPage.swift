@@ -4,6 +4,8 @@
 //
 
 import SwiftUI
+import AVFoundation
+import Combine
 
 struct CameraSettingsPage: View {
     @Bindable var pocController: POCController
@@ -42,6 +44,10 @@ struct CameraSettingsPage: View {
             hidePreview()
         }
         .onDisappear { hidePreview() }
+        // The list is a snapshot, so without this plugging in the picked
+        // camera leaves its row reading "(disconnected)" until the header
+        // refresh. List only: a replug must not restart or start the preview.
+        .onReceive(cameraHotPlugs) { _ in refreshDevices() }
         // Password/name/enrollment flows run in the notch, outside this
         // window, so nothing else prompts a re-check once one closes.
         .onChange(of: NotchOverlayController.shared.phase) { _, newPhase in
@@ -139,9 +145,19 @@ struct CameraSettingsPage: View {
         }
     }
 
-    /// Fired by the header's refresh icon (see `HeaderTrailingActionKey`).
+    /// Fired by the header's refresh icon (see `HeaderTrailingActionKey`)
+    /// and by camera hot-plugs.
     private func refreshDevices() {
         devices = CameraDeviceCatalog.availableDevices()
+    }
+
+    /// AVFoundation doesn't promise these arrive on the main thread; `devices` is view state.
+    private var cameraHotPlugs: AnyPublisher<Notification, Never> {
+        let center = NotificationCenter.default
+        return center.publisher(for: AVCaptureDevice.wasConnectedNotification)
+            .merge(with: center.publisher(for: AVCaptureDevice.wasDisconnectedNotification))
+            .receive(on: DispatchQueue.main)
+            .eraseToAnyPublisher()
     }
 
     private func cameraLabel(for id: String?) -> String {

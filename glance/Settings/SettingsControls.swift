@@ -352,6 +352,9 @@ struct SettingsOptionSliderRowContent: View {
             Text(title)
                 .font(SettingsMetrics.rowFont)
                 .foregroundStyle(SettingsMetrics.textPrimary)
+                // The slider below carries the title as its label, so
+                // VoiceOver would otherwise read it twice in a row.
+                .accessibilityHidden(true)
             // Tighter than the title-to-slider gap above, so the labels
             // read as annotating the slider's stops rather than floating a
             // full row's worth of space below it.

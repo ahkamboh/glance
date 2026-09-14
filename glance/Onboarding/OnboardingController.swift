@@ -721,7 +721,7 @@ final class OnboardingController {
     /// the display pin earlier onboarding saved.
     func selectCamera(id: String?) {
         GlanceSettings.shared.defaultCameraID = id
-        applyDisplayPinForCameraSelection()
+        clearLegacyBuiltInDisplayPin()
     }
 
     /// Releases a display pin that names the MacBook's own screen. Earlier onboarding saved
@@ -733,7 +733,7 @@ final class OnboardingController {
     /// `NotchGeometry.preferredScreen()` picks the built-in display anyway. Onboarding never
     /// saved any other display, so a pin on an external one was set in Settings and stays.
     /// A pin on a built-in screen that isn't connected can't be identified and is left too.
-    func applyDisplayPinForCameraSelection() {
+    func clearLegacyBuiltInDisplayPin() {
         let settings = GlanceSettings.shared
         guard let pinnedID = settings.preferredDisplayID,
               NSScreen.screens.contains(where: { $0.isBuiltIn && $0.matches(displayID: pinnedID) })

@@ -150,7 +150,9 @@ struct GeneralSettingsPage: View {
     private func displayPicker() -> some View {
         SettingsRowContent(title: "Display on") {
             SettingsMenuPickerPill(label: displayLabel) {
-                Button("Main display") {
+                // Not "Main display": unpinned placement prefers a notched
+                // screen, then the built-in one, rather than NSScreen.main.
+                Button("Automatic") {
                     settings.preferredDisplayID = nil
                     settings.preferredDisplayName = nil
                 }
@@ -178,7 +180,7 @@ struct GeneralSettingsPage: View {
     }
 
     private var displayLabel: String {
-        guard let targetID = settings.preferredDisplayID else { return "Main display" }
+        guard let targetID = settings.preferredDisplayID else { return "Automatic" }
         if let connected = screens.first(where: { $0.matches(displayID: targetID) }) {
             return connected.localizedName
         }

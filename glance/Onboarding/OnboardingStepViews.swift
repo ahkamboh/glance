@@ -237,12 +237,13 @@ struct SelectCameraStepView: View {
         .background(GlanceTheme.panel)
         .onAppear {
             controller.refreshCameraDevices()
-            controller.applyDisplayPinForCameraSelection()
+            controller.clearLegacyBuiltInDisplayPin()
         }
         // The list is a snapshot, and there's no refresh button here, so follow hot-plugs
         // (USB, dock, Continuity Camera) for as long as this step is on screen. The list only, not
-        // applyDisplayPinForCameraSelection(): while that still saves a display pin, a dock bringing
-        // a monitor and a webcam at once would pin a screen the user never chose.
+        // clearLegacyBuiltInDisplayPin(): that check is about which screens are connected, not
+        // cameras, and it already ran on appear and runs again on every pick, so a camera
+        // arriving or leaving gives it nothing new to act on.
         .onReceive(cameraHotPlugs) { _ in
             controller.refreshCameraDevices()
         }
