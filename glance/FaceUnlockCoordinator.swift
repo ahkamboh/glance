@@ -35,15 +35,22 @@ final class FaceUnlockCoordinator {
     private var scanWindowDuration: TimeInterval {
         TimeInterval(GlanceSettings.shared.faceDetectionSeconds)
     }
-    /// Requires several consecutive below-threshold frames so a single bad-angle read doesn't trigger the failure animation.
+    /// Requires several consecutive below-threshold frames so a single bad-angle read doesn't trigger the failure animation —
+    /// and, via `WrongFaceStreak`, a minimum time too, since six frames alone arrive in a fraction of a second.
     private let wrongFaceStreakThreshold = 6
 
     private(set) var statusMessage = "Idle"
     private(set) var lastOutcome: String?
 
     private var hasArmedForCurrentLock = false
-    /// One-shot per lock session — an auto-retry that could itself auto-retry would loop the camera for the whole lock session.
+    /// One-shot per wake (re-armed alongside `hasArmedForCurrentLock`) — an auto-retry that could itself auto-retry would loop
+    /// the camera for the whole lock session.
     private var hasAutoRetriedForCurrentLock = false
+    /// Set once a typed password leaves the screen locked, and cleared only by a real unlock (by any means). Until then nothing
+    /// types it again: resubmitting a stale password just walks loginwindow toward its failed-attempt delays.
+    private var hasRejectedPassword = false
+    /// Long enough for loginwindow to accept a correct password and drop the lock; a rejected one leaves it locked.
+    private let unlockConfirmationTimeout: Duration = .seconds(2)
     private var scanTask: Task<Void, Never>?
     /// Bumped by every `startScanCycle()`; a cycle bails once superseded (see `runScanCycle(generation:)`).
     private var scanGeneration = 0
@@ -55,6 +62,8 @@ final class FaceUnlockCoordinator {
     private var autoRetryTask: Task<Void, Never>?
     /// Gap between headless auto-retries, just to keep the camera from restarting in a tight loop.
     private let headlessRetryDelay: Duration = .seconds(1)
+    /// Cap on waiting for the camera's first frame before the scan clock starts anyway — a camera that never delivers still ends.
+    private let firstFrameWaitLimit: Duration = .seconds(2)
 
     /// When off, no notch/pill presence at all — every overlay call in this file is conditioned on this rather than just skipping the video.
     private var showsUI: Bool { GlanceSettings.shared.showUnlockAnimation }
@@ -92,15 +101,20 @@ final class FaceUnlockCoordinator {
         guard LockMonitor.isScreenActuallyLocked() else {
             hasArmedForCurrentLock = false
             hasAutoRetriedForCurrentLock = false
+            hasRejectedPassword = false
             disarmOverlay()
             return
         }
         guard !lockMonitor.isSleeping else { return }
 
-        // `.wake` (sleep, display sleep, or screensaver stopping) is an explicit "let me back in," so clear the one-shot guard.
+        // `.wake` (sleep, display sleep, or screensaver stopping) is an explicit "let me back in," so clear both one-shot guards.
         // `isWithinRecentArmBurst` keeps the several wake signals from one lid-open from each re-arming and fighting over the camera.
         if lockMonitor.lastEvent == .wake, !isWithinRecentArmBurst {
             hasArmedForCurrentLock = false
+            hasAutoRetriedForCurrentLock = false
+            // A retry still pending from before this wake would otherwise restart the camera under the scan this wake arms.
+            autoRetryTask?.cancel()
+            autoRetryTask = nil
         }
 
         // Runs before the hasArmedForCurrentLock guard — the space monitor's lifetime is tied to "locked + opted in," not to whether a scan already ran.
@@ -117,6 +131,15 @@ final class FaceUnlockCoordinator {
         }
         guard SecureCredentialManager.hasStoredPassword() else {
             statusMessage = "Face unlock is on, but no password is stored yet."
+            return
+        }
+        // Without it nothing can be typed, so a match could only end in a failure — don't spend a camera cycle finding out.
+        guard KeystrokeInjector.isAccessibilityTrusted() else {
+            statusMessage = "Face unlock is on, but Accessibility isn't granted — enable glance in System Settings."
+            return
+        }
+        guard !hasRejectedPassword else {
+            statusMessage = "Face unlock is paused: your saved password wasn't accepted. Unlock by typing it, then update it in Password settings."
             return
         }
 
@@ -184,7 +207,9 @@ final class FaceUnlockCoordinator {
               LockMonitor.isScreenActuallyLocked(),
               NotchGeometry.preferredScreen() != nil,
               SecureCredentialManager.isSessionUnlocked,
-              SecureCredentialManager.hasStoredPassword()
+              SecureCredentialManager.hasStoredPassword(),
+              KeystrokeInjector.isAccessibilityTrusted(),
+              !hasRejectedPassword
         else { return }
 
         // Already looking — swallows auto-repeat/double-presses and lets "On wake"/"On lock" override "On space" with no special-casing.
@@ -236,6 +261,10 @@ final class FaceUnlockCoordinator {
     private func runScanCycle(generation: Int) async {
         guard LockMonitor.isScreenActuallyLocked() else { return }
 
+        // `stop()` clears the last frame, but a callback already in flight on the session queue publishes after the clear,
+        // so a frame from the previous cycle usually survives into this one. Frame ids only grow, so any other id is new.
+        let staleFrameID = camera.currentFrame?.id
+
         await camera.start()
         guard generation == scanGeneration else { return }
 
@@ -243,6 +272,20 @@ final class FaceUnlockCoordinator {
             statusMessage = error
             camera.stop()
             return
+        }
+
+        // `start()` returns before the session has delivered anything, so starting the clock here spent part of a window as
+        // short as 3s scanning nothing. Both the overlay timer and the deadline below start once a fresh frame exists, so
+        // they still expire together.
+        let firstFrameDeadline = ContinuousClock.now + firstFrameWaitLimit
+        while camera.currentFrame == nil || camera.currentFrame?.id == staleFrameID,
+              ContinuousClock.now < firstFrameDeadline {
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            guard generation == scanGeneration else { return }
+            guard LockMonitor.isScreenActuallyLocked() else {
+                camera.stop()
+                return
+            }
         }
 
         let showsUI = self.showsUI
@@ -253,7 +296,8 @@ final class FaceUnlockCoordinator {
 
         let outcome = await observeScanWindow(
             deadline: Date().addingTimeInterval(scanWindowDuration),
-            requireOverlayScanning: showsUI
+            requireOverlayScanning: showsUI,
+            staleFrameID: staleFrameID
         )
 
         // A newer cycle now owns the camera and overlay — leave both alone, and leave the auto-retry one-shot unspent.
@@ -294,6 +338,18 @@ final class FaceUnlockCoordinator {
             } else {
                 scheduleAutoRetryIfEnabled(after: headlessRetryDelay)
             }
+        case .injectionFailed:
+            // No auto-retry: what stopped the typing (Accessibility, a locked session) won't clear itself within the retry delay.
+            statusMessage = "Recognized, but the password couldn't be typed: \(pocController.statusMessage)"
+            if showsUI {
+                NotchOverlayController.shared.finish(success: false)
+            }
+        case .notAccepted:
+            // No auto-retry either: `hasRejectedPassword` already stops any later match from typing it again.
+            statusMessage = "Your saved password wasn't accepted — it may have changed. Update it in Glance's Password settings."
+            if showsUI {
+                NotchOverlayController.shared.finish(success: false)
+            }
         }
     }
 
@@ -320,17 +376,22 @@ final class FaceUnlockCoordinator {
         /// A deny cue (glare, device rectangle) fired — actively rejected as a spoof regardless of match. Same failure path as `.consistentlyWrongFace`.
         case spoofSuspected
         case noResolution
+        /// Recognized and live, but nothing was typed — shown as a failure, never as a match.
+        case injectionFailed
+        /// Typed, but the screen stayed locked (now or on an earlier attempt this lock), so the saved password is presumed stale.
+        case notAccepted
     }
 
     /// Recognition and liveness run concurrently and each latches when it succeeds, so unlock fires the moment the second lands;
     /// liveness never fails the scan by staying undecided, it just keeps scanning until `deadline`.
     /// `requireOverlayScanning` bails early once the overlay's own timeout collapses the UI — only applied when there is an
     /// overlay, since headlessly `phase` never becomes `.scanning` at all.
-    private func observeScanWindow(deadline: Date, requireOverlayScanning: Bool) async -> ScanOutcome {
+    /// `staleFrameID` is the previous cycle's leftover frame, which is never scored even if the first-frame wait timed out.
+    private func observeScanWindow(deadline: Date, requireOverlayScanning: Bool, staleFrameID: UInt64?) async -> ScanOutcome {
         let livenessEnabled = GlanceSettings.shared.livenessChecksEnabled
         let liveness = LivenessAnalyzer()
         liveness.modeProvider = { GlanceSettings.shared.livenessMode }
-        var consecutiveWrongFaceFrames = 0
+        var wrongFaceStreak = WrongFaceStreak(minimumFrames: wrongFaceStreakThreshold, scanWindow: scanWindowDuration)
 
         /// Cleared the moment a detected face fails to match, so a latched match can't be handed to whoever steps in next.
         var readyMatch: ScoredIdentity?
@@ -339,7 +400,7 @@ final class FaceUnlockCoordinator {
         /// Last frame's selected face, passed back so `selectDominantFace` stays on the same person instead of flip-flopping.
         var lastFaceBoundingBox: CGRect?
         /// Cheap way to detect "no new camera frame yet" vs. "fresh frame" — without it a repeat frame would corrupt the liveness motion signal.
-        var lastProcessedFrameID: UInt64?
+        var lastProcessedFrameID = staleFrameID
 
         while Date() < deadline, !Task.isCancelled,
               !requireOverlayScanning || NotchOverlayController.shared.phase == .scanning {
@@ -361,7 +422,7 @@ final class FaceUnlockCoordinator {
             }.value
 
             guard let (result, livenessFrame) = outcome else {
-                consecutiveWrongFaceFrames = 0
+                wrongFaceStreak.reset()
                 lastFaceBoundingBox = nil
                 try? await Task.sleep(nanoseconds: 20_000_000)
                 continue
@@ -390,28 +451,59 @@ final class FaceUnlockCoordinator {
             let matched = pipeline.bestMatch(in: scored, threshold: matchThreshold)
 
             if let matched {
-                consecutiveWrongFaceFrames = 0
+                wrongFaceStreak.reset()
                 readyMatch = matched
             } else {
                 readyMatch = nil
-                consecutiveWrongFaceFrames += 1
-                if consecutiveWrongFaceFrames >= wrongFaceStreakThreshold {
+                // Only a frame enrollment would accept counts as evidence of someone else. An unaligned or low-quality frame
+                // neither extends nor breaks the streak — it just waits for the next frame, or for the deadline.
+                if FaceCaptureQuality.isEnrollmentGrade(alignmentTier: result.alignmentTier, quality: result.quality),
+                   wrongFaceStreak.recordMismatch(at: Date()) {
                     return .consistentlyWrongFace
                 }
             }
 
             if let readyMatch, livenessConfirmed {
+                // Checked here, at the point of typing, as well as before arming: a hover retry starts a cycle without those gates.
+                guard !hasRejectedPassword else { return .notAccepted }
                 statusMessage = "Recognized — unlocking…"
                 let livenessNote = livenessEnabled
                     ? (confirmingCue.map { "live via \($0.title)" } ?? "liveness clear")
                     : "liveness off"
                 lastOutcome = "Matched \(readyMatch.identity.name) at \(String(format: "%.3f", readyMatch.centroidSimilarity)), \(livenessNote)."
-                await pocController.injectStoredPassword(requireAuthoritativeLock: true)
+                // Presumed rejected from the moment typing starts, so an overlapping cycle can't submit it again while this one waits.
+                hasRejectedPassword = true
+                guard await pocController.injectStoredPassword(requireAuthoritativeLock: true) else {
+                    // Nothing reached loginwindow, so there's no rejection to remember.
+                    hasRejectedPassword = false
+                    return .injectionFailed
+                }
+                guard await screenUnlocksAfterInjection() else { return .notAccepted }
+                hasRejectedPassword = false
                 return .matched
             }
 
             try? await Task.sleep(nanoseconds: 20_000_000)
         }
         return .noResolution
+    }
+
+    /// loginwindow reports nothing back about a submitted password; the session actually unlocking is the only proof it was accepted.
+    private func screenUnlocksAfterInjection() async -> Bool {
+        let deadline = ContinuousClock.now + unlockConfirmationTimeout
+        while ContinuousClock.now < deadline, !Task.isCancelled {
+            if Self.isScreenConfirmedUnlocked() { return true }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return Self.isScreenConfirmedUnlocked()
+    }
+
+    /// `LockMonitor.isScreenActuallyLocked()` reads a missing session dictionary as unlocked, which is fail-closed for typing
+    /// but fail-open here: it would clear `hasRejectedPassword` for a password loginwindow never accepted. Only a dictionary
+    /// that exists and no longer carries the lock flag counts as proof.
+    private nonisolated static func isScreenConfirmedUnlocked() -> Bool {
+        guard let dict = CGSessionCopyCurrentDictionary() as? [String: Any] else { return false }
+        guard let locked = dict["CGSSessionScreenIsLocked"] else { return true }
+        return (locked as? Bool) == false
     }
 }

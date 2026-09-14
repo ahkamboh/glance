@@ -352,9 +352,8 @@ final class OnboardingController {
     /// Wait this long after yaw/pitch matches before samples count, so the user has
     /// settled into the turn rather than being captured mid-motion.
     private let poseHoldDuration: Duration = .milliseconds(500)
-    /// Permissive floor for Vision's capture-quality score (no fixed universal cutoff) —
-    /// better to accept a mediocre sample than stall the whole flow.
-    private let qualityFloor: Float = 0.2
+    /// Shared with unlock, which only counts frames at or above it against a match.
+    private let qualityFloor = FaceCaptureQuality.floor
     /// Hold off accepting captures this long once the camera comes up, so the first
     /// samples aren't taken mid-blink. Detection still runs during this window.
     private let initialCaptureDelay: Duration = .seconds(1.5)
