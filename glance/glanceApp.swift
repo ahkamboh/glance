@@ -132,6 +132,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self?.updateFaceUnlockReadiness()
             }
         }
+        // A pinned display being unplugged or plugged back in has no observable property, so the screen change is the signal.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.updateFaceUnlockReadiness()
+            }
+        }
+        // Accessibility has no change signal, so granting it in System Settings left the icon dimmed until the next lock.
+        // Coming back to glance afterwards is the natural moment to re-check.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.environment.pocController.refreshAccessibilityStatus()
+                self?.updateFaceUnlockReadiness()
+            }
+        }
 
         // SwiftUI can flip the app back to `.regular` while installing scenes even with `.suppressed`; re-assert accessory.
         NSApp.setActivationPolicy(.accessory)
@@ -237,10 +259,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         faceUnlockPausedMenuItem?.isHidden = reason == nil
     }
 
-    /// The gates `FaceUnlockCoordinator` checks before arming that the user can fix from here; nil when face unlock is off or ready.
+    /// Mirrors the user-fixable gates `FaceUnlockCoordinator.evaluateTrigger()` checks before arming, in its order, including
+    /// the pinned display; nil when face unlock is off or ready.
     private var faceUnlockPausedReason: String? {
         let settings = GlanceSettings.shared
         guard settings.hasCompletedOnboarding, settings.isFaceUnlockEnabled else { return nil }
+        // A pinned display that isn't connected makes the coordinator bail without arming; "Main display" (nil) always resolves.
+        if settings.preferredDisplayID != nil, NotchGeometry.preferredScreen() == nil { return "Pinned Display Disconnected" }
         if !SecureCredentialManager.isSessionUnlocked { return "Session Locked" }
         if !SecureCredentialManager.hasStoredPassword() { return "No Saved Password" }
         if !KeystrokeInjector.isAccessibilityTrusted() { return "Accessibility Not Granted" }
@@ -252,10 +277,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         withObservationTracking {
             _ = GlanceSettings.shared.isFaceUnlockEnabled
             _ = GlanceSettings.shared.hasCompletedOnboarding
+            _ = GlanceSettings.shared.preferredDisplayID
             _ = environment.pocController.hasStoredPassword
             _ = environment.pocController.isSessionUnlocked
             _ = environment.pocController.accessibilityGranted
-            // Every lock, unlock and wake — the only refresh for Accessibility being revoked, which has no signal of its own.
+            // Every lock, unlock and wake. Accessibility has no signal of its own, so this and app activation are what refresh it.
             _ = environment.faceUnlockCoordinator.lockMonitor.eventCount
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
