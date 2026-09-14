@@ -256,16 +256,20 @@ final class GlanceSettings {
         // Enabled by default — onboarding already enrolled a face and set a
         // password specifically to use Face Unlock.
         isFaceUnlockEnabled = defaults.object(forKey: Key.isFaceUnlockEnabled) as? Bool ?? true
-        // Matches `MatchConfidenceLevel.standard` — see RecognitionSettingsPage.swift.
-        matchThreshold = defaults.object(forKey: Key.matchThreshold) as? Float ?? 0.66
+        // Read from the stop itself, not a copied literal, so the slider's
+        // "Default" is always the value actually enforced. Stored values win.
+        matchThreshold = defaults.object(forKey: Key.matchThreshold) as? Float
+            ?? MatchConfidenceLevel.standard.threshold
         livenessChecksEnabled = defaults.object(forKey: Key.livenessChecksEnabled) as? Bool ?? true
         // Light by default — Heavy requires a blink/pose/depth signal a
         // still, non-blinking user may never produce, while Light still
         // catches the main attack (a photo on a phone screen).
         livenessMode = defaults.string(forKey: Key.livenessMode)
             .flatMap(LivenessMode.init(rawValue:)) ?? .light
-        // Matches `DetectionDistanceLevel.standard` — see RecognitionSettingsPage.swift.
-        minimumFaceWidth = defaults.object(forKey: Key.minimumFaceWidth) as? Float ?? 0.21
+        // Same as `matchThreshold` above: the literal 0.21 here outlived two
+        // moves of the stop, so cd1e42e's farther default never took effect.
+        minimumFaceWidth = defaults.object(forKey: Key.minimumFaceWidth) as? Float
+            ?? DetectionDistanceLevel.standard.minimumFaceWidth
 
         // Resolve the stored style first, `.none` included, then split it
         // into the pick + the on/off flag the UI now works in.
