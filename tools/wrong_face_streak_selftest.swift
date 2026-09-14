@@ -22,7 +22,8 @@
 //  camera: a 30fps run of mismatches (the old six-frame exit fired ~0.2s
 //  in), a slow camera that reaches the time floor before six frames, a
 //  streak broken by a match partway through, and runs where only some
-//  frames are enrollment-grade enough to count.
+//  frames are enrollment-grade enough to count, fed through the same
+//  `recordMismatch(alignmentTier:quality:at:)` the coordinator calls.
 //
 
 import Foundation
@@ -103,18 +104,23 @@ struct WrongFaceStreakSelfTest {
         check(!FaceCaptureQuality.isEnrollmentGrade(alignmentTier: .twoPoint, quality: 0.9), "2-point, even high quality -> ignored")
         check(!FaceCaptureQuality.isEnrollmentGrade(alignmentTier: .paddedCrop, quality: nil), "padded crop -> ignored")
 
-        // Mirrors FaceUnlockCoordinator.observeScanWindow: a mismatch is only recorded when the frame is enrollment-grade,
-        // and an ignored frame neither extends nor resets the streak.
         func runScan(window: TimeInterval, frames: [(tier: AlignmentTier, quality: Float?)]) -> (gaveUpAt: Int?, counted: Int) {
             var streak = WrongFaceStreak(minimumFrames: 6, scanWindow: window)
             for (index, frame) in frames.enumerated() {
                 let now = start.addingTimeInterval(Double(index) * 0.033)
-                if FaceCaptureQuality.isEnrollmentGrade(alignmentTier: frame.tier, quality: frame.quality),
-                   streak.recordMismatch(at: now) {
+                if streak.recordMismatch(alignmentTier: frame.tier, quality: frame.quality, at: now) {
                     return (index + 1, streak.frameCount)
                 }
             }
             return (nil, streak.frameCount)
+        }
+        do {
+            // A padded-crop frame is ignored outright: no give-up, and nothing counted toward the streak.
+            var streak = WrongFaceStreak(minimumFrames: 6, scanWindow: 5)
+            _ = streak.recordMismatch(alignmentTier: .fivePoint, quality: nil, at: start)
+            check(!streak.recordMismatch(alignmentTier: .paddedCrop, quality: 0.9, at: start.addingTimeInterval(0.033)),
+                  "padded crop returns false")
+            check(streak.frameCount == 1, "padded crop leaves frameCount unchanged")
         }
         do {
             // A full 5s window at 30fps of glasses/off-axis frames that never align: ends at the deadline, not as a wrong face.

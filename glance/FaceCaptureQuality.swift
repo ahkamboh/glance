@@ -8,7 +8,7 @@
 
 import Foundation
 
-enum FaceCaptureQuality {
+nonisolated enum FaceCaptureQuality {
     /// Permissive floor for Vision's capture-quality score (no fixed universal cutoff) —
     /// better to accept a mediocre sample than stall the whole flow.
     static let floor: Float = 0.2

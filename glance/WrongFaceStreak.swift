@@ -3,7 +3,8 @@
 //  glance
 //
 //  Decides when a run of non-matching frames is enough to end a scan as "Face not recognized" before its window runs out.
-//  Kept free of camera and Vision types so tools/wrong_face_streak_selftest.swift can drive it with synthetic timelines.
+//  Kept free of camera and pipeline state (it only takes a frame's alignment tier and quality score, via FaceAligner's
+//  `AlignmentTier`), so tools/wrong_face_streak_selftest.swift can drive it with synthetic timelines.
 //
 
 import Foundation
@@ -35,5 +36,13 @@ nonisolated struct WrongFaceStreak {
         frameCount += 1
         guard let startedAt, frameCount >= minimumFrames else { return false }
         return now.timeIntervalSince(startedAt) >= minimumDuration
+    }
+
+    /// Only a frame enrollment would accept counts as evidence of someone else. An unaligned or low-quality frame neither
+    /// extends nor breaks the streak (it records nothing and returns false), so the scan just waits for the next frame or
+    /// its deadline. The coordinator calls this, so the self-test exercises the same gating rather than a copy of it.
+    mutating func recordMismatch(alignmentTier: AlignmentTier, quality: Float?, at now: Date) -> Bool {
+        guard FaceCaptureQuality.isEnrollmentGrade(alignmentTier: alignmentTier, quality: quality) else { return false }
+        return recordMismatch(at: now)
     }
 }
