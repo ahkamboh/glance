@@ -101,7 +101,11 @@ final class FaceUnlockCoordinator {
         guard LockMonitor.isScreenActuallyLocked() else {
             hasArmedForCurrentLock = false
             hasAutoRetriedForCurrentLock = false
-            hasRejectedPassword = false
+            // `isScreenActuallyLocked()` also returns false when the session dictionary is momentarily missing. That is
+            // fail-closed for typing, but it would lift the rejected-password block without a real unlock, so only clear it on proof.
+            if Self.isScreenConfirmedUnlocked() {
+                hasRejectedPassword = false
+            }
             disarmOverlay()
             return
         }

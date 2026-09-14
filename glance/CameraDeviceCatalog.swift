@@ -58,17 +58,18 @@ enum CameraDeviceCatalog {
             )
         }
 
-        /// A saved display id is either a `CGDirectDisplayID` number (older installs) or a display UUID.
+        /// A saved display id is a display UUID or, on installs from before UUIDs, a `CGDirectDisplayID` number.
+        /// Delegates to `DisplayMath` so the camera override and the display picker share one matching rule.
         func matches(displayID: String) -> Bool {
-            displayID == String(number) || uuid?.caseInsensitiveCompare(displayID) == .orderedSame
+            DisplayMath.savedID(displayID, matchesUUID: uuid, number: number)
         }
     }
 
-    /// Decided here rather than via `NotchGeometry.preferredScreen()`, which consults the resolved camera and would
-    /// recurse back into `resolvedDevice()`. A connected pin wins; a stale pin falls through. Unpinned, the overlay goes
-    /// to the built-in panel whenever one is connected (a notched screen is always built-in), notched or not, and
-    /// only then to `NSScreen.main`. Deliberately not "notch, else main": on a notchless laptop that is the key window's
-    /// screen again.
+    /// Decided from the pin and the connected screens directly, rather than through `NotchGeometry.preferredScreen()`,
+    /// so the rule stays testable offline and camera choice never depends on overlay placement code. It mirrors that
+    /// rule: a connected pin wins; unpinned, the built-in panel wins whenever one is connected (a notched screen is
+    /// always built-in), and only then `NSScreen.main`. Deliberately not "notch, else main": on a notchless laptop that
+    /// is the key window's screen again.
     static func targetsBuiltInDisplay(pinnedID: String?, screens: [TargetDisplay], main: TargetDisplay?) -> Bool {
         if let pinnedID, let pinned = screens.first(where: { $0.matches(displayID: pinnedID) }) {
             return pinned.isBuiltIn

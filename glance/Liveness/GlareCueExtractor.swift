@@ -17,8 +17,9 @@ nonisolated enum GlareCueExtractor {
     private static let clusterGridSize = 8
 
     /// How far `CameraManager.renderCrop` grows the face box per side so the bezel and texture cues
-    /// see background around it. Must track that function; glare measures the face back out of it.
-    private static let renderCropExpansion: CGFloat = 0.15
+    /// see background around it. renderCrop reads this constant, so glare's mapping of the face back
+    /// out of the crop cannot drift from the crop itself.
+    static let renderCropExpansion: CGFloat = 0.15
 
     /// Where `faceBoundingBox` lands inside the crop `renderCrop` made from it, in the crop's
     /// top-left pixel space. Follows renderCrop's clamp at the frame edge, which drops the margin on

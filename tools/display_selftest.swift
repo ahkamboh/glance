@@ -39,6 +39,7 @@ enum DisplaySelfTest {
         check(DisplayMath.savedID(builtInUUID, matchesUUID: builtInUUID, number: 7),
               "UUID still matches after the display number changes (reboot, replug)")
         check(!DisplayMath.savedID(builtInUUID, matchesUUID: externalUUID, number: 2), "UUID does not match another display")
+        check(DisplayMath.savedID(builtInUUID.lowercased(), matchesUUID: builtInUUID, number: 1), "UUID matches regardless of case")
         check(DisplayMath.savedID("2", matchesUUID: externalUUID, number: 2), "legacy number still matches")
         check(!DisplayMath.savedID("2", matchesUUID: builtInUUID, number: 1), "legacy number does not match another display")
         check(!DisplayMath.savedID("12", matchesUUID: nil, number: 1), "no prefix match on numbers")
@@ -80,5 +81,3 @@ enum DisplaySelfTest {
         if failures > 0 { exit(1) }
     }
 }
-
-import Foundation

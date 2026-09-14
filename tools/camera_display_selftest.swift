@@ -9,6 +9,7 @@
 //
 //      swiftc -default-isolation MainActor -o /tmp/camera_display_selftest \
 //        glance/CameraDeviceCatalog.swift \
+//        glance/NotchOverlay/DisplayMath.swift \
 //        tools/camera_display_selftest.swift \
 //      && /tmp/camera_display_selftest
 //

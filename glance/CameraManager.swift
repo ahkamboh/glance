@@ -185,8 +185,10 @@ final class CameraManager: NSObject {
         let scaleX = frame.sourceSize.width / workingWidth
         let scaleY = frame.sourceSize.height / workingHeight
 
-        // Expand ~1.3x so device edges/bezels are captured for texture/moiré cues.
-        let expanded = imageRect.insetBy(dx: -imageRect.width * 0.15, dy: -imageRect.height * 0.15)
+        // Expand ~1.3x so device edges/bezels are captured for texture/moiré cues. The factor lives in GlareCueExtractor,
+        // which maps the face back out of this crop and must agree with it exactly.
+        let expansion = GlareCueExtractor.renderCropExpansion
+        let expanded = imageRect.insetBy(dx: -imageRect.width * expansion, dy: -imageRect.height * expansion)
 
         // Flip from `imageRect`'s top-left/y-down space to Core Image's bottom-left/y-up (reverse of FaceDetector.convertToImageSpace).
         let nativeX = expanded.origin.x * scaleX

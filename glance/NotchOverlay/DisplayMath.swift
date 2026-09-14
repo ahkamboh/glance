@@ -19,9 +19,11 @@ enum DisplayMath {
 
     /// Whether a saved display id names this display. The raw number is still accepted
     /// because that's what every choice saved before UUIDs holds; see
-    /// `NotchGeometry.preferredScreen()` for the rewrite that retires it.
+    /// `NotchGeometry.preferredScreen()` for the rewrite that retires it. UUIDs compare
+    /// case-insensitively, as UUIDs do. The display picker and the camera override both
+    /// match through here, so a pin can't be honoured by one and ignored by the other.
     static func savedID(_ saved: String, matchesUUID uuid: String?, number: CGDirectDisplayID) -> Bool {
-        if let uuid, saved == uuid { return true }
+        if let uuid, saved.uppercased() == uuid.uppercased() { return true }
         return saved == String(number)
     }
 
