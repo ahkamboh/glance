@@ -719,37 +719,28 @@ final class OnboardingController {
 
     /// Writes the pick straight into Settings — the same `defaultCameraID` the Camera
     /// settings page and `CameraDeviceCatalog.resolvedDevice()` read — then re-checks
-    /// whether the panel should follow the built-in display.
+    /// the display pin earlier onboarding saved.
     func selectCamera(id: String?) {
         GlanceSettings.shared.defaultCameraID = id
         applyDisplayPinForCameraSelection()
     }
 
-    /// Pins the Face Unlock panel to the MacBook's own screen while the built-in camera
-    /// is selected (auto-resolved or explicitly chosen), and releases that pin otherwise
-    /// so the panel returns to the user's normal (often external-monitor) screen. Only
-    /// meaningful with more than one screen connected — nothing to move on just one.
-    /// Called whenever the pick changes and again when the step first appears, so an
-    /// untouched system-default choice that happens to resolve to the built-in camera
-    /// still moves the panel.
+    /// Releases a display pin that names the MacBook's own screen. Earlier onboarding saved
+    /// one whenever the built-in camera was picked with a second screen connected, and a
+    /// saved display has no fallback, so closing the lid on a dock silently turned Face
+    /// Unlock off. Re-running setup used to rewrite that pin; now it clears it instead.
+    ///
+    /// Nothing moves while that screen is connected, because unpinned
+    /// `NotchGeometry.preferredScreen()` picks the built-in display anyway. Onboarding never
+    /// saved any other display, so a pin on an external one was set in Settings and stays.
+    /// A pin on a built-in screen that isn't connected can't be identified and is left too.
     func applyDisplayPinForCameraSelection() {
-        guard NSScreen.screens.count > 1 else { return }
-        let isBuiltIn = resolveSelectedCameraDevice()?.deviceType == .builtInWideAngleCamera
-        if isBuiltIn {
-            guard let builtInScreen = NSScreen.screens.first(where: { $0.isBuiltIn }) else { return }
-            GlanceSettings.shared.preferredDisplayID = builtInScreen.stableDisplayID
-            GlanceSettings.shared.preferredDisplayName = builtInScreen.localizedName
-        } else {
-            GlanceSettings.shared.preferredDisplayID = nil
-            GlanceSettings.shared.preferredDisplayName = nil
-        }
-    }
-
-    private func resolveSelectedCameraDevice() -> AVCaptureDevice? {
-        if let id = GlanceSettings.shared.defaultCameraID {
-            return AVCaptureDevice(uniqueID: id)
-        }
-        return resolveDefaultCameraDevice()
+        let settings = GlanceSettings.shared
+        guard let pinnedID = settings.preferredDisplayID,
+              NSScreen.screens.contains(where: { $0.isBuiltIn && $0.matches(displayID: pinnedID) })
+        else { return }
+        settings.preferredDisplayID = nil
+        settings.preferredDisplayName = nil
     }
 
     /// Same fallback `CameraDeviceCatalog.resolvedDevice()` uses once no override applies.

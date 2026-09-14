@@ -179,7 +179,7 @@ struct GeneralSettingsPage: View {
 
     private var displayLabel: String {
         guard let targetID = settings.preferredDisplayID else { return "Main display" }
-        if let connected = screens.first(where: { $0.stableDisplayID == targetID }) {
+        if let connected = screens.first(where: { $0.matches(displayID: targetID) }) {
             return connected.localizedName
         }
         // Picked, but not currently connected — say so rather than showing
