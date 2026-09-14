@@ -11,7 +11,7 @@ import Vision
 import CoreGraphics
 
 struct DeviceBezelObservation {
-    /// Face-enclosing, device-sized rectangle found this frame, same pixel space as `DetectedFace.boundingBox`.
+    /// Device-sized rectangle holding the face's core this frame, same pixel space as `DetectedFace.boundingBox`.
     let rectangle: CGRect?
     /// Fraction of the face's bounding box area that falls inside `rectangle`.
     let faceOverlapFraction: CGFloat?
@@ -20,14 +20,16 @@ struct DeviceBezelObservation {
 }
 
 nonisolated enum DeviceBezelDetector {
-    /// A bezel surrounds the face it shows. This much overhang per side, as a fraction of the face
-    /// box, absorbs box jitter and a photo zoomed right up to the screen edge; a rectangle cutting
-    /// deeper into the face is background the head is in front of.
-    private static let faceOverhangTolerance: CGFloat = 0.1
+    /// A screen always shows the face's core, so a rectangle only counts as a device when it holds
+    /// the face box inset by this fraction of its width and height per side: the eyes-nose-mouth
+    /// band. Requiring the whole box let a close selfie zoomed past the screen edge through, since
+    /// Vision's box then runs 15-25% past the screen on the cut side. A monitor or doorway the head
+    /// is merely in front of crosses the face near its middle and misses the core.
+    private static let faceCoreInset: CGFloat = 0.3
 
     /// Face area alone can't tell a room-scale window from a tablet: at the Far gate, or on a 4:3
-    /// camera, a tablet held fully in frame passes 16x the face it shows. So an enclosing rectangle
-    /// is only written off as background when it is this large *and* fills the view as well, where
+    /// camera, a tablet held fully in frame passes 16x the face it shows. So a rectangle around the
+    /// face is only written off as background when it is this large *and* fills the view as well, where
     /// a window around a far face and a tablet held flush to the lens look the same.
     private static let maximumFaceAreaRatio: CGFloat = 16
     /// Fraction of both frame dimensions a rectangle must span to count as filling the view. Vision
@@ -89,11 +91,10 @@ nonisolated enum DeviceBezelDetector {
                 && rect.width >= frameSize.width * viewFillingSpan
                 && rect.height >= frameSize.height * viewFillingSpan
         }
-        let slackX = faceBoundingBox.width * faceOverhangTolerance
-        let slackY = faceBoundingBox.height * faceOverhangTolerance
-        let devices = candidates.filter {
-            $0.insetBy(dx: -slackX, dy: -slackY).contains(faceBoundingBox) && !isRoomScale($0)
-        }
+        let faceCore = faceBoundingBox.insetBy(
+            dx: faceBoundingBox.width * faceCoreInset, dy: faceBoundingBox.height * faceCoreInset
+        )
+        let devices = candidates.filter { $0.contains(faceCore) && !isRoomScale($0) }
 
         guard let device = devices.max(by: { overlap($0) < overlap($1) }) else { return .none }
         return DeviceBezelObservation(rectangle: device, faceOverlapFraction: overlap(device))

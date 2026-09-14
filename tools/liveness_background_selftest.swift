@@ -103,6 +103,12 @@ private func overlap(_ rect: CGRect, _ face: CGRect) -> CGFloat {
     return intersection.isNull ? 0 : (intersection.width * intersection.height) / (face.width * face.height)
 }
 
+/// The rule the core-containment fix replaced: the whole face box, with 10% slack per side, inside
+/// the rectangle. A cut-face fixture must fail it, or its PASS doesn't show the fix.
+private func enclosesWholeFace(_ rect: CGRect, _ face: CGRect) -> Bool {
+    rect.insetBy(dx: -face.width * 0.1, dy: -face.height * 0.1).contains(face)
+}
+
 @main
 struct LivenessBackgroundSelfTest {
     static func main() {
@@ -166,6 +172,26 @@ struct LivenessBackgroundSelfTest {
         let zoomed = CGRect(x: face.minX + 6, y: face.minY - 30, width: face.width - 12, height: 200)
         expectDeviceDenied(DeviceBezelDetector.bestCandidate(among: [zoomed], faceBoundingBox: face, frameSize: frame), "a screen the face overhangs by 5%")
         print("PASS: a face slightly overhanging the screen edge still denies.")
+
+        // A close selfie zoomed so the screen edge cuts off the forehead, chin or a cheek: Vision's
+        // face box runs 15-25% past the screen on the cut side, but the screen still holds the core.
+        let cutTop = face.minY + face.height * 0.2
+        let cutBottom = face.maxY - face.height * 0.25
+        let cutSide = face.minX + face.width * 0.25
+        let cutFaces: [(String, CGRect)] = [
+            ("a screen inset 15% of the face per side", face.insetBy(dx: face.width * 0.15, dy: face.height * 0.15)),
+            ("a screen inset 25% of the face per side", face.insetBy(dx: face.width * 0.25, dy: face.height * 0.25)),
+            ("a screen cutting 20% off the top of the face", CGRect(x: phone.minX, y: cutTop, width: phone.width, height: phone.maxY - cutTop)),
+            ("a screen cutting 25% off the bottom of the face", CGRect(x: phone.minX, y: phone.minY, width: phone.width, height: cutBottom - phone.minY)),
+            ("a screen cutting 25% off one side of the face", CGRect(x: cutSide, y: phone.minY, width: phone.maxX - cutSide, height: phone.height)),
+        ]
+        for (label, screen) in cutFaces {
+            precondition(!enclosesWholeFace(screen, face), "FAIL: \(label) no longer reproduces the whole-face drop.")
+            let observation = DeviceBezelDetector.bestCandidate(among: [screen], faceBoundingBox: face, frameSize: frame)
+            precondition(observation.rectangle == screen, "FAIL: \(label) was not kept as a device, got \(observation).")
+            expectDeviceDenied(observation, label)
+            print(String(format: "PASS: %@ still denies (overlap %.2f).", label, Double(observation.faceOverlapFraction ?? 0)))
+        }
 
         // The old rule took the largest rectangle, which here is the background one.
         let window = CGRect(x: 0, y: 0, width: 230, height: 360)
@@ -253,6 +279,32 @@ struct LivenessBackgroundSelfTest {
         tablet.fill(tabletBody.insetBy(dx: 24, dy: 24), gray: 0.85)
         expectDeviceDenied(DeviceBezelDetector.detect(in: tablet.image, faceBoundingBox: CGRect(x: 272, y: 150, width: 96, height: 96)), "Vision: a tablet held up to a 4:3 camera")
         print("PASS: Vision: a tablet held up to a 4:3 camera, past 16x the face area, denies.")
+
+        // Neither the body nor the lit screen Vision may report holds the whole face box, so each
+        // scene must show the old whole-face rule dropping everything found, or its PASS proves nothing.
+        func expectCutFaceDenied(_ scene: Scene, face: CGRect, _ label: String) {
+            let candidates = DeviceBezelDetector.rectangleCandidates(in: scene.image)
+            precondition(
+                !candidates.isEmpty && !candidates.contains { enclosesWholeFace($0, face) },
+                "FAIL: \(label): Vision found \(candidates), so this scene no longer reproduces the whole-face drop."
+            )
+            expectDeviceDenied(DeviceBezelDetector.detect(in: scene.image, faceBoundingBox: face), label)
+            print("PASS: \(label) denies (Vision saw \(candidates.count) rectangle(s)).")
+        }
+
+        // Screen edge 27% into the face from the top, body edge 20%: the forehead is cut off.
+        let foreheadCut = Scene()
+        let foreheadBody = CGRect(x: 235, y: 135, width: 170, height: 215)
+        foreheadCut.fill(foreheadBody, gray: 0.05)
+        foreheadCut.fill(foreheadBody.insetBy(dx: 8, dy: 8), gray: 0.85)
+        expectCutFaceDenied(foreheadCut, face: face, "Vision: a zoomed selfie with the forehead cut off by the screen edge")
+
+        // Screen edge 25% into the face from the bottom, body edge 19%: the chin is cut off.
+        let chinCut = Scene()
+        let chinBody = CGRect(x: 235, y: 10, width: 170, height: 201)
+        chinCut.fill(chinBody, gray: 0.05)
+        chinCut.fill(chinBody.insetBy(dx: 8, dy: 8), gray: 0.85)
+        expectCutFaceDenied(chinCut, face: face, "Vision: a zoomed selfie with the chin cut off by the screen edge")
 
         let room = Scene()
         room.outline(CGRect(x: 20, y: 12, width: 600, height: 336), gray: 0.1, lineWidth: 14)
