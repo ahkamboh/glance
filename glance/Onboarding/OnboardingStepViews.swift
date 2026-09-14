@@ -8,6 +8,8 @@
 
 import SwiftUI
 import AppKit
+import AVFoundation
+import Combine
 
 // MARK: - 1. Intro
 
@@ -237,6 +239,22 @@ struct SelectCameraStepView: View {
             controller.refreshCameraDevices()
             controller.applyDisplayPinForCameraSelection()
         }
+        // The list is a snapshot, and there's no refresh button here, so follow hot-plugs
+        // (USB, dock, Continuity Camera) for as long as this step is on screen. The list only, not
+        // applyDisplayPinForCameraSelection(): while that still saves a display pin, a dock bringing
+        // a monitor and a webcam at once would pin a screen the user never chose.
+        .onReceive(cameraHotPlugs) { _ in
+            controller.refreshCameraDevices()
+        }
+    }
+
+    /// AVFoundation doesn't promise these arrive on the main thread; the controller is main-actor state.
+    private var cameraHotPlugs: AnyPublisher<Notification, Never> {
+        let center = NotificationCenter.default
+        return center.publisher(for: AVCaptureDevice.wasConnectedNotification)
+            .merge(with: center.publisher(for: AVCaptureDevice.wasDisconnectedNotification))
+            .receive(on: DispatchQueue.main)
+            .eraseToAnyPublisher()
     }
 }
 

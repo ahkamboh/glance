@@ -709,9 +709,9 @@ final class OnboardingController {
     /// Text shown inside the pill: the explicitly chosen device's name, or the resolved
     /// system default's name suffixed "(Default)" when nothing's been picked yet.
     var cameraSelectionLabel: String {
-        if let id = GlanceSettings.shared.defaultCameraID,
-           let device = cameraDevices.first(where: { $0.id == id }) {
-            return device.name
+        if let id = GlanceSettings.shared.defaultCameraID {
+            // A pick that's unplugged still applies on replug, so it isn't the default.
+            return cameraDevices.first(where: { $0.id == id })?.name ?? "Selected camera (disconnected)"
         }
         guard let name = resolveDefaultCameraDevice()?.localizedName else { return "System default" }
         return "\(name) (Default)"

@@ -145,8 +145,11 @@ struct CameraSettingsPage: View {
     }
 
     private func cameraLabel(for id: String?) -> String {
-        guard let id, let device = devices.first(where: { $0.id == id }) else {
-            return "System default"
+        guard let id else { return "System default" }
+        // Picked, but not currently connected — the pick still applies on
+        // replug, so don't make it look like it was cleared.
+        guard let device = devices.first(where: { $0.id == id }) else {
+            return "Selected camera (disconnected)"
         }
         return device.name
     }

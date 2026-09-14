@@ -121,13 +121,26 @@ final class CameraManager: NSObject {
     /// Called on every `start()` so a camera preference change in Settings takes effect without an app restart.
     private func reconcileDeviceIfNeeded() {
         guard let device = CameraDeviceCatalog.resolvedDevice() else {
+            // Forget the dead input too, or a replug of the same camera matches it below and is never re-added.
+            if let currentInput, session.inputs.contains(currentInput) {
+                session.beginConfiguration()
+                session.removeInput(currentInput)
+                session.commitConfiguration()
+            }
+            currentInput = nil
             errorMessage = "No camera device found."
             return
         }
-        guard device.uniqueID != currentInput?.device.uniqueID else { return }
+        // Same uniqueID isn't enough: a replugged camera reports the same uniqueID as the dead input `currentInput`
+        // still holds, and whether the session drops that input on unplug isn't documented. The unplugged device
+        // object stays disconnected for good, so require that too and the swap below replaces the input either way.
+        if let currentInput, currentInput.device.uniqueID == device.uniqueID, currentInput.device.isConnected,
+           session.inputs.contains(currentInput) {
+            return
+        }
 
         session.beginConfiguration()
-        if let currentInput {
+        if let currentInput, session.inputs.contains(currentInput) {
             session.removeInput(currentInput)
         }
         if let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
