@@ -451,7 +451,8 @@ final class OnboardingController {
     /// Live head direction, or `nil` when there's nothing to point at. `progress` hits 1 exactly when the pose starts
     /// matching, which is now true for the diagonals too.
     var headTurn: HeadTurn? {
-        guard step == .enroll, !enrollmentComplete, faceDetected, !isTooFar, !isTooDark,
+        // `recognitionUnavailableReason`: setup can't capture on the fallback embedder, so don't animate a ring that can't fill.
+        guard step == .enroll, !enrollmentComplete, faceDetected, !isTooFar, !isTooDark, recognitionUnavailableReason == nil,
               let pose = currentPose, pose != .center,
               let yaw = currentYaw, let pitch = currentPitch else { return nil }
 

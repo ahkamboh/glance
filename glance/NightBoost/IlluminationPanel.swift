@@ -4,11 +4,11 @@
 //
 //  The "flood light": a borderless, click-through panel that paints the upper part of the screen a warm near-white while
 //  a dark-room scan runs. Warm rather than pure white on purpose — the glare deny cue only counts near-*grey* highlights
-//  (luma ≥ 235 AND |Cb-128|, |Cr-128| ≤ 10 — GlareCueExtractor.swift:12-13), so a warm reflection off glasses or a
-//  forehead stays chromatic and is not mistaken for the screen glare that betrays a spoof.
+//  (at or above `GlareCueExtractor.specularLumaFloor` and within `specularChromaTolerance` of neutral), so a warm
+//  reflection off glasses or a forehead stays chromatic and is not mistaken for the screen glare that betrays a spoof.
 //
-//  The failure this avoids is a false DENY of a live user, not a false accept: a tripped glare cue latches for the whole
-//  scan (LivenessCues.swift:173,227), so one bright reflection would reject a real face for all 5 seconds.
+//  The failure this avoids is a false DENY of a live user, not a false accept: a tripped glare cue latches for the rest
+//  of the scan window (see LivenessCues.swift), so one bright reflection would reject a real face until the scan ends.
 //
 
 import AppKit

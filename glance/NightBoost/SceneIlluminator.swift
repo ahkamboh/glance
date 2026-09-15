@@ -3,9 +3,10 @@
 //  glance
 //
 //  Turns the Mac's own display into the flood illuminator Face ID gets from hardware: for the duration of a dark-room
-//  scan, drives the target display to full brightness and shows a warm panel over its upper part (the password field in
-//  the lower third stays clear). Everything is restored on `end()`, which is idempotent and is called from every scan
-//  exit path plus disarm — the worst case of a crash mid-scan is a screen left bright, never a stuck panel.
+//  scan, raises the target display's brightness and shows a warm panel over its top 38% (loginwindow's avatar and
+//  password field, near the vertical middle, stay clear). Everything is restored on `end()`, which is idempotent and is
+//  called from every scan exit path plus disarm — the worst case of a crash mid-scan is a screen left bright, never a
+//  stuck panel.
 //
 //  Lock-screen visibility uses the same SkyLight delegation as the notch (see NotchSkyLight.swift); without it the panel
 //  is simply invisible while locked and only the brightness boost applies.
@@ -17,10 +18,10 @@ import AppKit
 final class SceneIlluminator {
     static let shared = SceneIlluminator()
 
-    /// How much of the screen height, measured from the top, the light panel covers. Deliberately the top third only:
+    /// How much of the screen height, measured from the top, the light panel covers. Deliberately the top 38% only:
     /// loginwindow draws the avatar and password field around the vertical middle, and a panel over that would hide the
     /// manual fallback exactly when face unlock is struggling. The top band is also nearest the camera, so it is the
-    /// most useful third to light anyway.
+    /// most useful part to light anyway.
     static let coverageFraction: CGFloat = 0.38
     /// Not fully opaque so the wallpaper still ghosts through and it reads as "a light came on", not "the screen broke".
     static let panelAlpha: CGFloat = 0.88

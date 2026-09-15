@@ -310,7 +310,10 @@ final class CameraManager: NSObject {
 
             // Night boost: measure the raw working frame, then gain it up if the room is dark. The native `source`
             // stays untouched so the glare cue keeps reading real sensor highlights (see LowLightEnhancer.swift).
-            let meanLuminance = SceneLuminance.meanLuminance(of: ciImage, context: ciContext) ?? 1
+            // With Night Boost off nothing reads the measurement, so skip its per-frame GPU readback; 1 reads as bright.
+            let meanLuminance = LowLightEnhancer.isEnabled
+                ? (SceneLuminance.meanLuminance(of: ciImage, context: ciContext) ?? 1)
+                : 1
             let enhanced = LowLightEnhancer.enhance(ciImage, meanLuminance: meanLuminance)
             let isEnhanced = enhanced !== ciImage
             guard let cgImage = ciContext.createCGImage(enhanced, from: enhanced.extent) else { return }
