@@ -361,6 +361,10 @@ final class OnboardingController {
     /// Whether the last-seen face read as too small to enroll reliably — swaps the pose
     /// instruction for a "move closer" prompt while true.
     private(set) var isTooFar = false
+    /// Set when the room is dark enough that Night Boost is gaining frames up. Enrolling from those would bake a
+    /// noisy, under-exposed face into the template, which then matches neither daylight nor the flood-lit scan the
+    /// unlock path produces in the same room.
+    private(set) var isTooDark = false
     private(set) var enrollmentComplete = false
 
     /// Sectors already captured — read by EnrollmentRingView to decide which
@@ -423,6 +427,7 @@ final class OnboardingController {
         // First, because it is the only one of these the user cannot act their way out of.
         if recognitionUnavailableReason != nil { return "Face recognition unavailable — setup can't continue" }
         if enrollmentComplete { return "Face captured" }
+        if isTooDark { return "Too dark to set up — turn on a light" }
         if isTooFar { return "Bring your face closer" }
         return currentPose?.instruction ?? ""
     }
@@ -446,7 +451,7 @@ final class OnboardingController {
     /// Live head direction, or `nil` when there's nothing to point at. `progress` hits 1 exactly when the pose starts
     /// matching, which is now true for the diagonals too.
     var headTurn: HeadTurn? {
-        guard step == .enroll, !enrollmentComplete, faceDetected, !isTooFar,
+        guard step == .enroll, !enrollmentComplete, faceDetected, !isTooFar, !isTooDark,
               let pose = currentPose, pose != .center,
               let yaw = currentYaw, let pitch = currentPitch else { return nil }
 
@@ -606,6 +611,7 @@ final class OnboardingController {
         matchStreak = 0
         poseHoldStartedAt = nil
         isTooFar = false
+        isTooDark = false
         enrollmentComplete = false
         guideVisible = false
         cameraPreviewVisible = true
@@ -618,6 +624,9 @@ final class OnboardingController {
         guideVisible = true
         cameraPreviewVisible = true
         showCheckmark = false
+        // Stale from a previous dark attempt would otherwise show "Too dark" and suppress head-turn feedback before
+        // the restarted camera has produced a single frame to judge.
+        isTooDark = false
         poseStartedAt = .now
         captureReadyAt = .now + initialCaptureDelay
         poseHoldStartedAt = nil
@@ -759,6 +768,14 @@ final class OnboardingController {
               let cameraFrame = camera.currentFrame, let pose = currentPose else { return }
         isProcessingFrame = true
         defer { isProcessingFrame = false }
+
+        guard !cameraFrame.isLowLightEnhanced else {
+            isTooDark = true
+            matchStreak = 0
+            poseHoldStartedAt = nil
+            return
+        }
+        isTooDark = false
 
         let pipeline = self.pipeline
         let minimumWidth = enrollmentMinimumFaceWidth
